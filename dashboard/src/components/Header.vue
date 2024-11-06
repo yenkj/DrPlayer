@@ -1,8 +1,6 @@
 <template>
-  <!-- 内容上方面包屑-->
-  <a-breadcrumb :style="{ margin: '16px 0' }">
-    <a-breadcrumb-item>Home</a-breadcrumb-item>
-
+  <a-layout-header class="header">
+    <!-- 左侧控制按钮 -->
     <div class="header-left">
       <a-button shape="circle" @click="goBack">
         <template #icon>
@@ -50,45 +48,57 @@
       </a-button>
 
     </div>
-
-  </a-breadcrumb>
-
-  <!-- 内容区域 -->
-  <a-layout-content class="content">
-    <div>
-      <h1>主页</h1>
-      <p>这是主页页面的内容。</p>
-    </div>
-  </a-layout-content>
-
+  </a-layout-header>
 </template>
 
-<script setup>
-const goBack = () => {
+<script>
+import {defineComponent} from 'vue';
+import {Message} from '@arco-design/web-vue';
 
-}
-const goForward = () => {
-
-}
-const refreshPage = () => {
-
-}
-const onSearch = () => {
-
-}
-const minimize = () => {
-
-}
-const maximize = () => {
-
-}
-const closeWindow = () => {
-
-}
+export default defineComponent({
+  components: {},
+  methods: {
+    goBack() {
+      Message.info("前进按钮");
+      // 执行前进逻辑
+    },
+    goForward() {
+      Message.info("后退按钮");
+      // 执行后退逻辑
+    },
+    refreshPage() {
+      Message.info("刷新页面");
+      // 刷新页面逻辑
+      window.location.reload();
+    },
+    onSearch(value) {
+      Message.info(`搜索内容: ${value}`);
+      // 执行搜索逻辑
+    },
+    minimize() {
+      Message.info("最小化窗口");
+      // 最小化窗口的逻辑，可以通过调用系统接口来实现
+    },
+    maximize() {
+      Message.info("最大化窗口");
+      // 最大化窗口的逻辑
+    },
+    closeWindow() {
+      Message.info("关闭窗口");
+      // 关闭窗口的逻辑，可以通过调用系统接口来实现
+    },
+  }
+});
 </script>
 
 <style scoped>
-/* 页面样式 */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  background: #fff;
+}
 
 .header-left,
 .header-right {

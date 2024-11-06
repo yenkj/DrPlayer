@@ -1,21 +1,16 @@
 import {createApp} from 'vue'
-import PrimeVue from 'primevue/config';
-import Aura from '@primevue/themes/aura';
-import './style.css'
-import 'primeflex/primeflex.css'
-import 'primeflex/themes/primeone-light.css' // 亮系主题
-// import 'primeflex/themes/primeone-dark.css'  // 暗系主题
-import 'primeicons/primeicons.css';  // 图标
-import router from './router';  // 引入路由
+// import './style.css'
 import App from './App.vue'
-import { createPinia } from 'pinia';
+import router from './router'  // 引入路由
+import ArcoVue from '@arco-design/web-vue'
+import ArcoVueIcon from '@arco-design/web-vue/es/icon';
+import '@arco-design/web-vue/dist/arco.css'
+import {createPinia} from 'pinia'
 
-const app = createApp(App);
-app.use(PrimeVue, {
-    theme: {
-        preset: Aura
-    }
-});
+
+const app = createApp(App)
 app.use(router)
+app.use(ArcoVue);
+app.use(ArcoVueIcon);
 app.use(createPinia())
 app.mount('#app')
