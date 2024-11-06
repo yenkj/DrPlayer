@@ -1,7 +1,7 @@
 <template>
   <!-- 内容上方面包屑-->
   <a-breadcrumb :style="{ margin: '16px 0' }">
-    <a-breadcrumb-item>Home</a-breadcrumb-item>
+    <a-breadcrumb-item>Video</a-breadcrumb-item>
 
     <div class="header-left">
       <a-button type="outline" status="success" shape="round" @click="handleOpenForm">
@@ -150,7 +150,7 @@ const getData = async () => {
 };
 
 const getNowSite = () => {
-  if (nowSite) {
+  if (nowSite && nowSite.name) {
     form.now_site = nowSite;
     form.now_site_title = nowSite.name;
   }

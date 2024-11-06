@@ -3,13 +3,13 @@ yarn create vite
 yarn add primevue primeicons
 yarn add unplugin-vue-components
 yarn add @primevue/auto-import-resolver
-yarn add @primevue/themes 
+yarn add @primevue/themes
 yarn add primeflex
 
 yarn add vue-router
 yarn add pinia
 
-yarn remove primevue primeicons @primevue/auto-import-resolver primeflex @primevue/themes 
+yarn remove primevue primeicons @primevue/auto-import-resolver primeflex @primevue/themes
 yarn add --dev @arco-design/web-vue
 yarn add json-server
 yarn add axios
@@ -17,3 +17,16 @@ yarn add axios
 https://juejin.cn/post/7387581121519812617
 
 [arco组件库](https://arco.design/vue/component/layout)
+
+# 注意事项
+package.json 需要注意 如果有 type:'module' 需要删除
+json-server版本号只能 ^0.17.4,不然不支持middleware
+
+# 图标全选加购
+```javascript
+var span = document.querySelectorAll('.icon-cover');
+for (var i = 0, len = span.length; i < len; i++) {
+     console.log(span[i].querySelector('span').click());
+}
+
+```

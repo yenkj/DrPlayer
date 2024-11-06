@@ -41,11 +41,14 @@
           <icon-expand/>
         </template>
       </a-button>
-      <a-button shape="circle" @click="closeWindow">
-        <template #icon>
-          <icon-close/>
-        </template>
-      </a-button>
+      <a-popconfirm content="你确认要关闭当前应用?" @ok="closeWindow">
+        <a-button shape="circle">
+          <template #icon>
+            <icon-close/>
+          </template>
+        </a-button>
+      </a-popconfirm>
+
 
     </div>
   </a-layout-header>
@@ -78,14 +81,42 @@ export default defineComponent({
     minimize() {
       Message.info("最小化窗口");
       // 最小化窗口的逻辑，可以通过调用系统接口来实现
+      this.exitFullScreen()
     },
     maximize() {
       Message.info("最大化窗口");
       // 最大化窗口的逻辑
+      this.enterFullScreen()
     },
     closeWindow() {
-      Message.info("关闭窗口");
+      Message.info("将在1秒后关闭窗口");
       // 关闭窗口的逻辑，可以通过调用系统接口来实现
+      setTimeout(function () {
+        window.open("about:blank", "_self").close()
+      }, 1000)
+    },
+    enterFullScreen() {
+      let element = document.documentElement;
+      if (element.requestFullscreen) {
+        element.requestFullscreen();
+      } else if (element.mozRequestFullScreen) { /* Firefox */
+        element.mozRequestFullScreen();
+      } else if (element.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+        element.webkitRequestFullscreen();
+      } else if (element.msRequestFullscreen) { /* IE/Edge */
+        element.msRequestFullscreen();
+      }
+    },
+    exitFullScreen() {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.mozCancelFullScreen) { /* Firefox */
+        document.mozCancelFullScreen();
+      } else if (document.webkitExitFullscreen) { /* Chrome, Safari and Opera */
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) { /* IE/Edge */
+        document.msExitFullscreen();
+      }
     },
   }
 });

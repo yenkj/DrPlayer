@@ -5,6 +5,8 @@ import Live from '@/views/Live.vue';
 import Settings from '@/views/Settings.vue';
 import Collection from '@/views/Collection.vue';
 import History from '@/views/History.vue';
+import Reader from '@/views/Reader.vue';
+import Parser from '@/views/Parser.vue';
 
 const routes = [
     {path: '/', component: Home},
@@ -13,6 +15,8 @@ const routes = [
     {path: '/settings', component: Settings},
     {path: '/collection', component: Collection},
     {path: '/history', component: History},
+    {path: '/reader', component: Reader},
+    {path: '/parser', component: Parser},
 ];
 
 const router = createRouter({
