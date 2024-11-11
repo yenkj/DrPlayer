@@ -35,6 +35,8 @@ for (var i = 0, len = span.length; i < len; i++) {
 
 https://juejin.cn/post/7301193497247727652
 
+[解决vercel项目刷新404问题](https://juejin.cn/post/7358336719165554740)
+
 # 我部署的demo
 
 https://drplayer.playdreamer.cn/
