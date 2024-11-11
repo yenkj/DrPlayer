@@ -142,7 +142,13 @@ const currentSite = ref(null);
 // 获取站点数据
 const getData = async () => {
   try {
-    const response = await req.get('/config'); // 假设这个请求返回 sites 数组
+    let response;
+    if(req.defaults.baseURL === ''){
+      response = await req.get('/mock/data.json');
+      response = response.config;
+    }else{
+      response = await req.get('/config'); // 假设这个请求返回 sites 数组
+    }
     form.sites = response.sites; // 给 form.sites 赋值
   } catch (error) {
     console.error('请求数据失败:', error);

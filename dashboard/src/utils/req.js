@@ -46,7 +46,7 @@ req.interceptors.response.use(
 if (process.env.NODE_ENV === 'development') {
     req.defaults.baseURL = 'http://127.0.0.1:9978'; // 开发环境使用本地服务器
 } else {
-    req.defaults.baseURL = 'https://api.example.com'; // 生产环境使用线上 API
+    req.defaults.baseURL = ''; // 生产环境使用线上 API
 }
 
 
