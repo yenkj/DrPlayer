@@ -1,6 +1,7 @@
 import {createRouter, createWebHistory} from 'vue-router';
 import Home from '@/views/Home.vue';
 import Video from '@/views/Video.vue';
+import Video2 from '@/views/Video2.vue';
 import Live from '@/views/Live.vue';
 import Settings from '@/views/Settings.vue';
 import Collection from '@/views/Collection.vue';
@@ -11,6 +12,7 @@ import Parser from '@/views/Parser.vue';
 const routes = [
     {path: '/', component: Home},
     {path: '/video', component: Video},
+    {path: '/video2', component: Video2},
     {path: '/live', component: Live},
     {path: '/settings', component: Settings},
     {path: '/collection', component: Collection},

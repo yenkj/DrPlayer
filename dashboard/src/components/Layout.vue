@@ -104,12 +104,13 @@ export default defineComponent({
       menuItems: [
         {id: 1, name: '主页', icon: 'icon-shouye', route: '/'},
         {id: 2, name: '点播', icon: 'icon-dianbo', route: '/video'},
-        {id: 3, name: '直播', icon: 'icon-dianshizhibo', route: '/live'},
-        {id: 4, name: '书画柜', icon: 'icon-2zushushishujia', route: '/reader'},
-        {id: 5, name: '解析', icon: 'icon-yumingjiexi', route: '/parser'},
-        {id: 6, name: '收藏', icon: 'icon-shoucang', route: '/collection'},
-        {id: 7, name: '历史', icon: 'icon-lishi', route: '/history'},
-        {id: 8, name: '设置', icon: 'icon-shezhi', route: '/settings'}
+        {id: 3, name: '点播2', icon: 'icon-dianbo', route: '/video2'},
+        {id: 4, name: '直播', icon: 'icon-dianshizhibo', route: '/live'},
+        {id: 5, name: '书画柜', icon: 'icon-2zushushishujia', route: '/reader'},
+        {id: 6, name: '解析', icon: 'icon-yumingjiexi', route: '/parser'},
+        {id: 7, name: '收藏', icon: 'icon-shoucang', route: '/collection'},
+        {id: 8, name: '历史', icon: 'icon-lishi', route: '/history'},
+        {id: 9, name: '设置', icon: 'icon-shezhi', route: '/settings'}
       ],
       logoSrc: logo,
       logoDesc:'the logo for this application',
