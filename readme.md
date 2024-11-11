@@ -30,3 +30,13 @@ for (var i = 0, len = span.length; i < len; i++) {
 }
 
 ```
+
+# 部署教程
+
+https://juejin.cn/post/7301193497247727652
+
+# 我部署的demo
+
+https://drplayer.playdreamer.cn/
+
+https://hipy.playdreamer.cn/
