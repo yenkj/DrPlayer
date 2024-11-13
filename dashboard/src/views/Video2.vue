@@ -1,62 +1,21 @@
 <template>
-  <!-- 内容上方面包屑-->
-  <a-breadcrumb :style="{ margin: '16px 0' }">
-    <a-breadcrumb-item>Video</a-breadcrumb-item>
-
-    <div class="header-left">
-      <a-button type="outline" status="success" shape="round" @click="handleOpenForm">
-        <template #icon>
-          <icon-apps/>
-        </template>
-        <template #default>{{ form.now_site_title }}</template>
-      </a-button>
-
-      <a-button type="outline" status="success" shape="round" @click="refreshPage">
-        <template #icon>
-          <icon-refresh/>
-        </template>
-        <template #default>重载源</template>
-      </a-button>
-    </div>
-
-    <!-- 中间搜索框 -->
-    <div class="header-center">
-      <a-input-search
-          placeholder="搜索视频"
-          enter-button
-          @search="onSearch"
-          style="width: 300px;"
-      />
-    </div>
-
-    <!-- 右侧控制按钮 -->
-    <div class="header-right">
-      <a-button type="outline" status="success" shape="round" @click="minimize">
-        <template #icon>
-          <icon-bug/>
-        </template>
-        <template #default>调试</template>
-      </a-button>
-
-      <a-button type="outline" status="success" shape="round" @click="maximize">
-        <template #icon>
-          <icon-settings/>
-        </template>
-        <template #default>设置</template>
-      </a-button>
-      <a-button type="outline" status="success" shape="round" @click="closeWindow">
-        <template #icon>
-          <icon-user/>
-        </template>
-        <template #default>用户设置</template>
-      </a-button>
-
-      <!-- 当前时间显示 -->
+  <Breadcrumb
+    :navigation_title="'点播'"
+    @handleOpenForm="handleOpenForm"
+    @refreshPage="refreshPage"
+    @minimize="minimize"
+    @maximize="maximize"
+    @closeWindow="closeWindow"
+    @onSearch="onSearch"
+    :now_site_title="form.now_site_title"
+  >
+    <template v-slot:default>
+      <!-- 默认default 插槽的内容放这里 -->
       <div class="current-time">
         <span>{{ currentDateTime }}</span>
       </div>
-    </div>
-  </a-breadcrumb>
+    </template>
+  </Breadcrumb>
 
   <!-- 内容区域 -->
   <a-layout-content class="content">
@@ -71,46 +30,47 @@
   </a-layout-content>
 
   <SourceDialog
-      :visible="form.visible"
-      :title="form.form_title"
-      :sites="form.sites"
-      :currentSiteKey="form.now_site.key"
-      @update:visible="val => form.visible = val"
-      @confirm-clear="handleConfirmClear"
-      @confirm-change="handleConfirmChange"
-      @change-rule="handleChangeRule"
+    :visible="form.visible"
+    :title="form.form_title"
+    :sites="form.sites"
+    :currentSiteKey="form.now_site.key"
+    @update:visible="(val) => (form.visible = val)"
+    @confirm-clear="handleConfirmClear"
+    @confirm-change="handleConfirmChange"
+    @change-rule="handleChangeRule"
   />
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue';
-import SourceDialog from '../components/SourceDialog.vue';
-import req from '@/utils/req';
-import { useSiteStore } from '@/stores/siteStore';
+import { ref, reactive, onMounted, onBeforeUnmount } from "vue";
+import SourceDialog from "../components/SourceDialog.vue";
+import Breadcrumb from "../components/Breadcrumb.vue";
+import req from "@/utils/req";
+import { useSiteStore } from "@/stores/siteStore";
 
 const { nowSite, setCurrentSite } = useSiteStore();
 
-const currentDateTime = ref('');
+const currentDateTime = ref("");
 const form = reactive({
   sites: [],
-  now_site_title: 'hipy影视',
+  now_site_title: "hipy影视",
   now_site: {},
   visible: false,
-  form_title: '',
+  form_title: "",
 });
 const timer = ref(null);
 const getData = async () => {
   try {
     let response;
-    if(req.defaults.baseURL === ''){
-      response = await req.get('/mock/data.json');
+    if (req.defaults.baseURL === "") {
+      response = await req.get("/mock/data.json");
       response = response.config;
-    }else{
-      response = await req.get('/config'); // 假设这个请求返回 sites 数组
+    } else {
+      response = await req.get("/config"); // 假设这个请求返回 sites 数组
     }
     form.sites = response.sites; // 给 form.sites 赋值
   } catch (error) {
-    console.error('请求数据失败:', error);
+    console.error("请求数据失败:", error);
   }
 };
 
@@ -119,29 +79,32 @@ const getNowSite = () => {
     form.now_site = nowSite;
     form.now_site_title = nowSite.name;
   }
-}
+};
 
 const checkNowSite = () => {
-  form.new_site = form.now_site
+  form.new_site = form.now_site;
   if (!form.new_site.key && form.sites.length > 0) {
-    form.new_site = form.sites[0]
-  } else if (form.new_site.key && !form.sites.map(i => i.key).includes(form.new_site.key)) {
-    form.new_site = form.sites[0]
+    form.new_site = form.sites[0];
+  } else if (
+    form.new_site.key &&
+    !form.sites.map((i) => i.key).includes(form.new_site.key)
+  ) {
+    form.new_site = form.sites[0];
   }
-}
+};
 
 const formatDate = (date) => {
   const options = {
-    weekday: 'long', // 星期几
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+    weekday: "long", // 星期几
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
     hour12: true, // 12小时制
   };
-  return date.toLocaleString('zh-CN', options);
+  return date.toLocaleString("zh-CN", options);
 };
 
 // 启动定时器
@@ -158,9 +121,9 @@ const refreshPage = () => {
 const minimize = () => {};
 const maximize = () => {};
 const closeWindow = () => {};
-const onSearch = (value) => console.log('搜索内容:', value);
+const onSearch = (value) => console.log("搜索内容:", value);
 
-const handleChangeRule = (site) => form.new_site = site;
+const handleChangeRule = (site) => (form.new_site = site);
 
 const handleConfirmClear = () => {
   form.now_site = form.new_site;
@@ -171,7 +134,7 @@ const handleConfirmClear = () => {
 };
 
 const handleConfirmChange = (site) => {
-  console.log('确认换源');
+  console.log("确认换源");
   form.now_site = site;
   setCurrentSite(site);
   form.now_site_title = site.name;
@@ -190,7 +153,6 @@ onMounted(() => {
   getNowSite(); // 获取储存的当前源
   startClock(); // 启动时钟
 });
-
 
 // 清理定时器
 onBeforeUnmount(() => {
