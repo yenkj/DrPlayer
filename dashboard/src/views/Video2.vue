@@ -9,7 +9,7 @@
     @onSearch="onSearch"
     :now_site_title="form.now_site_title"
   >
-    <template v-slot:default>
+     <template #default>
       <!-- 默认default 插槽的内容放这里 -->
       <div class="current-time">
         <span>{{ currentDateTime }}</span>
