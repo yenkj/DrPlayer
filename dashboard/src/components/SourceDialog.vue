@@ -5,6 +5,7 @@
       :width="dialogWidth"
       class="change_rule_dialog"
       append-to-body
+      :on-before-cancel="handleConfirmClear"
   >
     <a-input
         v-model="siteFilter"
@@ -128,9 +129,13 @@ const handleConfirmChange = () => {
   display: flex;
   flex-wrap: wrap;
 }
+/* .btn-item:nth-child(8) {
+      margin-right: 0;
+} */
 .btn-item {
   text-align: center;
   width: calc(31.3%);
   padding: 2px;
 }
+.btn-item button {width: 100%;}
 </style>
