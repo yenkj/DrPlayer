@@ -9,24 +9,15 @@
     @onSearch="onSearch"
     :now_site_title="form.now_site_title"
   >
-     <template #default>
-      <!-- 默认default 插槽的内容放这里 -->
-      <div class="current-time">
-        <span>{{ currentDateTime }}</span>
-      </div>
-    </template>
+    <!-- 默认插槽的内容放这里 -->
+    <div class="current-time">
+      <span>{{ currentDateTime }}</span>
+    </div>
   </Breadcrumb>
 
   <!-- 内容区域 -->
   <a-layout-content class="content">
-    <div>
-      <h1>点播</h1>
-      <p>这是点播页面的内容。</p>
-      <ul v-if="form.sites.length > 0">
-        <li v-for="site in form.sites" :key="site.key">{{ site.name }}</li>
-      </ul>
-      <p v-else>没有站点信息。</p>
-    </div>
+    <VideoList :classList="form.classList" />
   </a-layout-content>
 
   <SourceDialog
@@ -45,6 +36,7 @@
 import { ref, reactive, onMounted, onBeforeUnmount } from "vue";
 import SourceDialog from "../components/SourceDialog.vue";
 import Breadcrumb from "../components/Breadcrumb.vue";
+import VideoList from "../components/VideoList.vue";
 import req from "@/utils/req";
 import { useSiteStore } from "@/stores/siteStore";
 
@@ -57,7 +49,10 @@ const form = reactive({
   now_site: {},
   visible: false,
   form_title: "",
+  classList: {},
+  videoList: {},
 });
+
 const timer = ref(null);
 const getData = async () => {
   try {
@@ -121,7 +116,6 @@ const refreshPage = () => {
 const minimize = () => {};
 const maximize = () => {};
 const closeWindow = () => {};
-const onSearch = (value) => console.log("搜索内容:", value);
 
 const handleChangeRule = (site) => (form.new_site = site);
 
@@ -134,11 +128,28 @@ const handleConfirmClear = () => {
 };
 
 const handleConfirmChange = (site) => {
-  console.log("确认换源");
   form.now_site = site;
   setCurrentSite(site);
   form.now_site_title = site.name;
   form.visible = false;
+  getClassList(site); //获取分类列表
+};
+//获取分类列表
+const getClassList = async (site) => {
+  console.log(site, "确认换源");
+
+  let response;
+  if (req.defaults.baseURL === "") {
+    response = await req.get("/mock/data.json");
+    form.classList = response.home;
+  } else {
+    response = await req.get("/home");
+    form.classList = response;
+  }
+  console.log(form.classList);
+};
+const onSearch = (value) => {
+  console.log("搜索内容:", value);
 };
 
 const handleOpenForm = () => {
@@ -151,6 +162,7 @@ const handleOpenForm = () => {
 onMounted(() => {
   getData(); // 页面加载时获取数据
   getNowSite(); // 获取储存的当前源
+  getClassList(form.now_site);
   startClock(); // 启动时钟
 });
 
