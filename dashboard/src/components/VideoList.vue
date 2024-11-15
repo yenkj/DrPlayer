@@ -13,13 +13,13 @@
         @scroll="scrollToBottom($event)"
         :style="'height:' + listHeight + 'px; overflow: auto;margin-right: 14px;'"
       >
-        <a-grid :cols="{ xs: 1, sm: 2, md: 3, lg: 4, xl: 5, xxl: 6 }" :rowGap="20">
+        <a-grid :cols="{ xs: 1, sm: 2, md: 3, lg: 4, xl: 5, xxl: 6 }" :rowGap="10">
           <a-grid-item
             v-for="item in listData[activeKey]"
             :key="item.vod_id"
             class="video_list_hover"
           >
-            <div style="margin: 10px" class="video_list_item">
+            <div class="video_list_item">
               <div class="video_list_item_img">
                 <a-image
                   :preview="false"
@@ -46,13 +46,13 @@
         @scroll="scrollToBottom($event)"
         :style="'height:' + listHeight + 'px; overflow: auto;margin-right: 14px;'"
       >
-        <a-grid :cols="{ xs: 1, sm: 2, md: 3, lg: 4, xl: 5, xxl: 6 }" :rowGap="20">
+        <a-grid :cols="{ xs: 1, sm: 2, md: 3, lg: 4, xl: 5, xxl: 6 }" :rowGap="10">
           <a-grid-item
             v-for="item in listData[item.type_id]"
             :key="item.vod_id"
             class="video_list_hover"
           >
-            <div style="margin: 10px" class="video_list_item">
+            <div class="video_list_item">
               <div class="video_list_item_img">
                 <a-image
                   :preview="false"
@@ -146,6 +146,7 @@ onMounted(() => {
   box-shadow: 0 2px 12px 0 rgb(190, 190, 190);
   border: 1px solid rgb(207, 207, 207);
   border-radius: 8px;
+  margin: 10px 10px 0 10px;
 }
 .video_list_hover {
   cursor: pointer;
