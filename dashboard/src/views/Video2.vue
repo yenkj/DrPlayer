@@ -1,6 +1,5 @@
 <template>
   <Breadcrumb
-    :navigation_title="'点播'"
     @handleOpenForm="handleOpenForm"
     @refreshPage="refreshPage"
     @minimize="minimize"
