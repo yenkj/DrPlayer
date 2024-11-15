@@ -49,7 +49,6 @@
         </template>
         <template #default>用户设置</template>
       </a-button>
-
       <slot name="default"></slot>
     </div>
   </a-breadcrumb>
@@ -57,7 +56,11 @@
 
 <script setup>
 const props = defineProps({
-  navigation_title: String,
+  navigation_title: {
+    type: String,
+    default: "Video",
+  },
+
   now_site_title: String,
 });
 const emit = defineEmits([
