@@ -229,7 +229,8 @@ class VideoService {
         videos: (response.list || []).map(this.formatVideoInfo),
         pagination: this.createPagination(response, page),
         keyword: keyword.trim(),
-        total: response.total || 0
+        total: response.total || 0,
+        rawResponse: response // 添加原始响应数据用于调试
       }
 
       return result
@@ -405,10 +406,44 @@ class VideoService {
     const pagination = createPaginationInfo()
     
     pagination.page = currentPage
-    pagination.total = response.total || 0
-    pagination.pageSize = response.limit || 20
-    pagination.totalPages = Math.ceil(pagination.total / pagination.pageSize)
-    pagination.hasNext = currentPage < pagination.totalPages
+    
+    // 处理不同的API响应格式
+    const total = response.total || response.recordcount || 0
+    const pageCount = response.pagecount || response.totalPages || 0
+    const pageSize = response.limit || response.pagesize || 20
+    const currentList = response.list || []
+    
+    pagination.total = total
+    pagination.pageSize = pageSize
+    
+    // 如果API返回了总页数，直接使用
+    if (pageCount > 0) {
+      pagination.totalPages = pageCount
+      pagination.hasNext = currentPage < pageCount
+    } else if (total > 0) {
+      // 否则根据总数计算
+      pagination.totalPages = Math.ceil(total / pageSize)
+      pagination.hasNext = currentPage < pagination.totalPages
+    } else {
+      // 如果没有总数信息，根据当前返回的数据判断
+      // 检查是否有"no_data"标识
+      const hasNoDataFlag = currentList.some(item => 
+        item.vod_id === 'no_data' || 
+        item.vod_name === 'no_data' ||
+        (typeof item === 'string' && item.includes('no_data'))
+      )
+      
+      if (hasNoDataFlag || currentList.length === 0) {
+        // 如果有no_data标识或列表为空，表示没有更多数据
+        pagination.hasNext = false
+        pagination.totalPages = currentPage
+      } else {
+        // 否则假设还有下一页，需要实际请求下一页来确认
+        pagination.hasNext = true
+        pagination.totalPages = currentPage + 1
+      }
+    }
+    
     pagination.hasPrev = currentPage > 1
 
     return pagination

@@ -31,19 +31,23 @@
           :key="filterGroup.key"
           class="filter-group"
         >
-          <div class="filter-group-title">{{ filterGroup.name }}</div>
-          <div class="filter-options">
-            <a-tag
-              v-for="option in filterGroup.value"
-              :key="option.v"
-              :color="isSelected(filterGroup.key, option.v) ? 'green' : ''"
-              :checkable="true"
-              :checked="isSelected(filterGroup.key, option.v)"
-              @check="handleToggleFilter(filterGroup.key, option.v, option.n)"
-              class="filter-option-tag"
-            >
-              {{ option.n }}
-            </a-tag>
+          <div class="filter-group-row">
+            <div class="filter-group-title">{{ filterGroup.name }}</div>
+            <div class="filter-options-container">
+              <div class="filter-options">
+                <a-tag
+                  v-for="option in filterGroup.value"
+                  :key="option.v"
+                  :color="isSelected(filterGroup.key, option.v) ? 'green' : ''"
+                  :checkable="true"
+                  :checked="isSelected(filterGroup.key, option.v)"
+                  @check="handleToggleFilter(filterGroup.key, option.v, option.n)"
+                  class="filter-option-tag"
+                >
+                  {{ option.n }}
+                </a-tag>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -126,33 +130,93 @@ const handleResetFilters = () => {
 }
 
 .filter-content {
-  padding: 0 16px 16px;
+  padding: 0 16px 8px;
 }
 
 .filter-group {
-  margin-bottom: 16px;
+  margin-bottom: 4px;
+  padding: 4px 12px;
+  background: var(--color-fill-1);
+  border-radius: 6px;
+  border-left: 3px solid var(--color-primary-light-3);
 }
 
 .filter-group:last-child {
   margin-bottom: 0;
 }
 
+.filter-group-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 28px;
+}
+
 .filter-group-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-1);
-  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-2);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 70px;
+  text-align: left;
+  background: var(--color-fill-3);
+  padding: 4px 8px 4px 20px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-2);
+  position: relative;
+}
+
+.filter-group-title::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background: var(--color-primary-light-4);
+  border-radius: 2px;
+  border: 1px solid var(--color-primary-light-2);
+}
+
+.filter-options-container {
+  flex: 1;
+  overflow: hidden;
 }
 
 .filter-options {
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-3) transparent;
+}
+
+.filter-options::-webkit-scrollbar {
+  height: 4px;
+}
+
+.filter-options::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.filter-options::-webkit-scrollbar-thumb {
+  background: var(--color-border-3);
+  border-radius: 2px;
+}
+
+.filter-options::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-2);
 }
 
 .filter-option-tag {
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .filter-option-tag:hover {

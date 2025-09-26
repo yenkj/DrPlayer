@@ -253,8 +253,6 @@ const onSearch = async (value) => {
   searchState.currentPage = 1;
 
   try {
-    console.log("开始搜索:", keyword, "当前源:", form.now_site);
-    
     if (!form.now_site || !form.now_site.key) {
       throw new Error("请先选择数据源");
     }
@@ -270,8 +268,6 @@ const onSearch = async (value) => {
     searchState.searchResults = searchData.videos || [];
     searchState.totalPages = searchData.pagination?.totalPages || 1;
     searchState.hasMore = searchData.pagination?.hasNext || false;
-    
-    console.log("搜索结果:", searchState.searchResults);
   } catch (error) {
     console.error("搜索失败:", error);
     searchState.searchError = error.message || "搜索失败，请重试";
@@ -296,12 +292,30 @@ const onSearchLoadMore = async () => {
       apiUrl: form.now_site.api
     });
 
+
+
     // 追加新的搜索结果到现有结果中
     const newVideos = searchData.videos || [];
-    searchState.searchResults = [...searchState.searchResults, ...newVideos];
+    
+    // 检查是否有重复数据或no_data标识
+    const existingIds = new Set(searchState.searchResults.map(v => v.vod_id));
+    const uniqueNewVideos = newVideos.filter(video => {
+      // 过滤掉重复的视频和no_data标识
+      return !existingIds.has(video.vod_id) && 
+             video.vod_id !== 'no_data' && 
+             video.vod_name !== 'no_data';
+    });
+    
+    // 如果新数据为空或全部重复，表示没有更多数据
+     if (uniqueNewVideos.length === 0) {
+       searchState.hasMore = false;
+     } else {
+      searchState.searchResults = [...searchState.searchResults, ...uniqueNewVideos];
+      searchState.hasMore = searchData.pagination?.hasNext !== false; // 只有明确返回false才停止
+    }
+    
     searchState.currentPage = nextPage;
-    searchState.totalPages = searchData.pagination?.totalPages || 1;
-    searchState.hasMore = searchData.pagination?.hasNext || false;
+    searchState.totalPages = searchData.pagination?.totalPages || searchState.totalPages;
   } catch (error) {
     console.error("搜索加载更多失败:", error);
     searchState.searchError = error.message || "加载失败，请重试";
@@ -317,6 +331,11 @@ const exitSearch = () => {
   searchState.searchResults = [];
   searchState.searchError = null;
   searchState.currentPage = 1;
+};
+
+// 处理视频点击事件
+const handleVideoClick = (video) => {
+  // 这里可以添加视频点击后的处理逻辑，比如跳转到播放页面
 };
 
 

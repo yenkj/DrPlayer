@@ -21,9 +21,11 @@
     <!-- 中间搜索框 -->
     <div class="header-center">
       <a-input-search
+        v-model="searchValue"
         placeholder="搜索视频"
         enter-button
         @search="onSearch"
+        @press-enter="onSearch"
       />
     </div>
 
@@ -57,6 +59,8 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
+
 const props = defineProps({
   navigation_title: {
     type: String,
@@ -74,6 +78,8 @@ const emit = defineEmits([
   "onSearch",
 ]);
 
+const searchValue = ref('')
+
 const handleOpenForm = () => {
   emit("handleOpenForm");
 };
@@ -81,7 +87,11 @@ const refreshPage = () => {
   emit("refreshPage");
 };
 const onSearch = (value) => {
-  emit("onSearch", value);
+  // 如果value是字符串，使用它；否则使用当前输入框的值
+  const searchTerm = typeof value === 'string' ? value : searchValue.value
+  if (searchTerm && typeof searchTerm === 'string' && searchTerm.trim()) {
+    emit("onSearch", searchTerm.trim());
+  }
 };
 
 const closeWindow = () => {
