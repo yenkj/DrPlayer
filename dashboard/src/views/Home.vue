@@ -1,113 +1,64 @@
 <template>
-  <!-- 内容上方面包屑-->
-  <a-breadcrumb :style="{ margin: '16px 0' }">
-    <a-breadcrumb-item>Home</a-breadcrumb-item>
-
-    <div class="header-left">
-      <a-button shape="circle" @click="goBack">
-        <template #icon>
-          <icon-left/>
-        </template>
-      </a-button>
-      <a-button shape="circle" @click="goForward">
-        <template #icon>
-          <icon-right/>
-        </template>
-      </a-button>
-      <a-button shape="circle" @click="refreshPage">
-        <template #icon>
-          <icon-refresh/>
-        </template>
-      </a-button>
+  <div class="home-container">
+    <!-- 简化的标题显示 -->
+    <div class="simple-header">
+      <span class="navigation-title">Home</span>
     </div>
 
-    <!-- 中间搜索框 -->
-    <div class="header-center">
-      <a-input-search
-          placeholder="请输入搜索内容"
-          enter-button
-          @search="onSearch"
-          style="width: 300px;"
-      />
+    <!-- 内容区域 -->
+    <div class="main-content">
+      <h1 class="content-title">主页</h1>
+      <p class="content-description">这是主页页面的内容。</p>
     </div>
-
-    <!-- 右侧控制按钮 -->
-    <div class="header-right">
-      <a-button shape="circle" @click="minimize">
-        <template #icon>
-          <icon-shrink/>
-        </template>
-      </a-button>
-      <a-button shape="circle" @click="maximize">
-        <template #icon>
-          <icon-expand/>
-        </template>
-      </a-button>
-      <a-button shape="circle" @click="closeWindow">
-        <template #icon>
-          <icon-close/>
-        </template>
-      </a-button>
-
-    </div>
-
-  </a-breadcrumb>
-
-  <!-- 内容区域 -->
-  <a-layout-content class="content">
-    <div>
-      <h1>主页</h1>
-      <p>这是主页页面的内容。</p>
-    </div>
-  </a-layout-content>
-
+  </div>
 </template>
 
 <script setup>
-const goBack = () => {
-
-}
-const goForward = () => {
-
-}
-const refreshPage = () => {
-
-}
-const onSearch = () => {
-
-}
-const minimize = () => {
-
-}
-const maximize = () => {
-
-}
-const closeWindow = () => {
-
-}
+// 简化的Home页面，只需要基本的Vue功能
 </script>
 
 <style scoped>
-/* 页面样式 */
+.home-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
 
-.header-left,
-.header-right {
+.simple-header {
   display: flex;
   align-items: center;
+  width: 100%;
+  padding: 16px 20px;
+  background: var(--color-bg-3);
+  border-bottom: 1px solid var(--color-border-2);
+  box-sizing: border-box;
 }
 
-.header-left button,
-.header-right button {
-  margin-right: 10px;
+.navigation-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  white-space: nowrap;
 }
 
-.header-center {
-  flex-grow: 1;
-  display: flex;
-  justify-content: center;
+.main-content {
+  flex: 1;
+  padding: 20px;
+  background: var(--color-bg-2);
+  border-radius: 8px;
+  margin-top: 16px;
 }
 
-.header-center a-input-search {
-  width: 300px;
+.content-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  margin-bottom: 16px;
+}
+
+.content-description {
+  font-size: 16px;
+  color: var(--color-text-2);
+  line-height: 1.6;
 }
 </style>
