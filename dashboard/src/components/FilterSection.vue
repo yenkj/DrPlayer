@@ -24,7 +24,7 @@
       </a-button>
     </div>
     
-    <a-collapse-transition>
+    <transition name="collapse">
       <div v-show="visible" class="filter-content">
         <div 
           v-for="filterGroup in filters" 
@@ -51,7 +51,7 @@
           </div>
         </div>
       </div>
-    </a-collapse-transition>
+    </transition>
   </div>
 </template>
 
@@ -221,5 +221,26 @@ const handleResetFilters = () => {
 
 .filter-option-tag:hover {
   transform: translateY(-1px);
+}
+
+/* 折叠动画 */
+.collapse-enter-active,
+.collapse-leave-active {
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.collapse-enter-from,
+.collapse-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.collapse-enter-to,
+.collapse-leave-from {
+  max-height: 500px;
+  opacity: 1;
 }
 </style>

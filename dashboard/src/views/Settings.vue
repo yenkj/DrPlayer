@@ -557,8 +557,8 @@ loadConfig()
 .settings-content {
   flex: 1;
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   padding: 20px 24px 40px;
   display: flex;
   flex-direction: column;

@@ -142,8 +142,20 @@ export const validateVideoId = (videoId) => {
     return false
   }
   
-  // 视频ID不能为空且长度合理
-  return videoId.trim().length > 0 && videoId.length <= 100
+  const trimmedId = videoId.trim()
+  
+  // 视频ID不能为空
+  if (trimmedId.length === 0) {
+    return false
+  }
+  
+  // no_data 被认为是无效的视频ID
+  if (trimmedId === 'no_data') {
+    return false
+  }
+  
+  // 视频ID长度限制在1024字符内
+  return videoId.length <= 1024
 }
 
 /**

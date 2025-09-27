@@ -98,8 +98,10 @@
 
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { usePaginationStore } from '@/stores/paginationStore'
 
+const router = useRouter()
 const paginationStore = usePaginationStore()
 
 // Props
@@ -236,7 +238,23 @@ const checkTextOverflow = () => {
 
 // 视频点击处理
 const handleVideoClick = (video) => {
-  emit('video-click', video)
+  if (video && video.vod_id) {
+    router.push({
+        name: 'VideoDetail',
+        params: { id: video.vod_id },
+        query: {
+          name: video.vod_name,
+          pic: video.vod_pic,
+          year: video.vod_year,
+          area: video.vod_area,
+          type: video.vod_type,
+          remarks: video.vod_remarks,
+          content: video.vod_content,
+          actor: video.vod_actor,
+          director: video.vod_director
+        }
+      });
+  }
 }
 
 // 退出搜索

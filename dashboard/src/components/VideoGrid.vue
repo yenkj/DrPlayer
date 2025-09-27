@@ -12,7 +12,7 @@
           :key="video.vod_id"
           class="video_list_hover"
         >
-          <div class="video_list_item">
+          <div class="video_list_item" @click="handleVideoClick(video)">
             <div class="video_list_item_img">
               <a-image
                 :preview="false"
@@ -54,6 +54,7 @@
 
 <script setup>
 import { onMounted, nextTick, ref, onBeforeUnmount, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 const props = defineProps({
   videos: {
@@ -72,9 +73,31 @@ const props = defineProps({
 
 const emit = defineEmits(['load-more', 'scroll-bottom']);
 
+const router = useRouter();
 const containerRef = ref(null);
 const scrollbarRef = ref(null);
 const scrollAreaHeight = ref(0);
+
+// 视频点击处理
+const handleVideoClick = (video) => {
+  if (video && video.vod_id) {
+    router.push({
+        name: 'VideoDetail',
+        params: { id: video.vod_id },
+        query: {
+          name: video.vod_name,
+          pic: video.vod_pic,
+          year: video.vod_year,
+          area: video.vod_area,
+          type: video.vod_type,
+          remarks: video.vod_remarks,
+          content: video.vod_content,
+          actor: video.vod_actor,
+          director: video.vod_director
+        }
+      });
+  }
+};
 
 const updateScrollAreaHeight = () => {
   nextTick(() => {

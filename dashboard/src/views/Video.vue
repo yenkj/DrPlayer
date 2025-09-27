@@ -186,9 +186,8 @@ const handleConfirmClear = () => {
 
 const handleConfirmChange = (site) => {
   form.now_site = site;
-  // 同时更新两个store
+  // 使用 siteStore 统一管理站点切换
   setCurrentSite(site);
-  siteService.setCurrentSite(site.key);
   form.now_site_title = site.name;
   form.visible = false;
   getClassList(site); //获取分类列表
@@ -335,7 +334,23 @@ const exitSearch = () => {
 
 // 处理视频点击事件
 const handleVideoClick = (video) => {
-  // 这里可以添加视频点击后的处理逻辑，比如跳转到播放页面
+  if (video && video.vod_id) {
+    router.push({
+         name: 'VideoDetail',
+         params: { id: video.vod_id },
+         query: {
+           name: video.vod_name,
+           pic: video.vod_pic,
+           year: video.vod_year,
+           area: video.vod_area,
+           type: video.vod_type,
+           remarks: video.vod_remarks,
+           content: video.vod_content,
+           actor: video.vod_actor,
+           director: video.vod_director
+         }
+       });
+  }
 };
 
 
@@ -370,6 +385,8 @@ onBeforeUnmount(() => {
      - current-time元素额外高度：14px (padding + border)
      - 总计：67px */
   height: calc(100% - 67px);
+  /* 使用100%最小高度，继承父容器 */
+  /* min-height: 100%;  */
   display: flex;
   flex-direction: column;
   overflow: hidden;

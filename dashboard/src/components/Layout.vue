@@ -170,10 +170,10 @@ export default defineComponent({
 
 /* 主布局区域 */
 .layout-demo {
-  height: 100vh;
+  height: calc(100vh - 64px); /* 减去header高度 */
   background: var(--color-fill-2);
   border: 1px solid var(--color-border);
-  padding-top: 64px; /* 为固定header留出空间 */
+  margin-top: 64px; /* 使用margin代替padding */
   display: flex;
 }
 
@@ -192,7 +192,7 @@ export default defineComponent({
   margin-left: 200px; /* 为侧边栏留出空间，默认展开宽度 */
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 64px); /* 减去header高度 */
+  height: 100%; /* 使用100%高度，继承父容器 */
   overflow: hidden;
   transition: margin-left 0.2s ease; /* 添加过渡动画 */
 }

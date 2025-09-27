@@ -142,9 +142,10 @@ class VideoService {
    * @param {string} module - 模块名称
    * @param {string} videoId - 视频ID
    * @param {string} apiUrl - 站点API地址
+   * @param {boolean} skipCache - 是否跳过缓存
    * @returns {Promise} 视频详情数据
    */
-  async getVideoDetails(module, videoId, apiUrl) {
+  async getVideoDetails(module, videoId, apiUrl, skipCache = false) {
     if (!validateModule(module)) {
       throw new Error('无效的模块名称')
     }
@@ -154,9 +155,16 @@ class VideoService {
     }
 
     const cacheKey = `detail_${module}_${videoId}`
-    const cached = this.getFromCache(cacheKey)
-    if (cached) {
-      return cached
+    
+    // 如果不跳过缓存，则检查缓存
+    if (!skipCache) {
+      const cached = this.getFromCache(cacheKey)
+      if (cached) {
+        console.log('使用缓存的视频详情:', { module, videoId })
+        return cached
+      }
+    } else {
+      console.log('跳过缓存，强制获取最新视频详情:', { module, videoId })
     }
 
     try {
@@ -483,5 +491,7 @@ class VideoService {
 
 // 创建单例实例
 const videoService = new VideoService()
+
+
 
 export default videoService
