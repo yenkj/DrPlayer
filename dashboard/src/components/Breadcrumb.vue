@@ -107,6 +107,9 @@ const emit = defineEmits([
   "refreshPage",
   "onSearch",
   "handlePush",
+  "minimize",
+  "maximize", 
+  "closeWindow",
 ]);
 
 const searchValue = ref('')
