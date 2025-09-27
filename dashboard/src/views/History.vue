@@ -331,8 +331,8 @@ const goToDetail = async (item) => {
           tempSiteApi: siteInfo.api,
           tempSiteKey: siteInfo.key,
           // 传递历史记录信息，用于恢复播放状态
-          historyRoute: item.current_route,
-          historyEpisode: item.current_episode,
+          historyRoute: item.current_route_name,
+          historyEpisode: item.current_episode_name,
           historyProgress: item.progress || 0,
           // 添加来源页面信息
           sourceRouteName: 'History',
