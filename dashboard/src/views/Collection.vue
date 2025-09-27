@@ -349,7 +349,11 @@ const goToDetail = async (item) => {
           // 传递站源信息，不影响全局状态
           tempSiteName: siteInfo.name,
           tempSiteApi: siteInfo.api,
-          tempSiteKey: siteInfo.key
+          tempSiteKey: siteInfo.key,
+          // 添加来源页面信息
+          sourceRouteName: 'Collection',
+          sourceRouteParams: JSON.stringify({}),
+          sourceRouteQuery: JSON.stringify({})
         }
       })
     
@@ -365,7 +369,8 @@ const goToVideo = () => {
 }
 
 const handleImageError = (event) => {
-  event.target.src = '/default-poster.svg'
+  // 使用相对路径，适配子目录部署
+  event.target.src = './default-poster.svg'
   event.target.style.objectFit = 'contain'
   event.target.style.backgroundColor = '#f7f8fa'
 }

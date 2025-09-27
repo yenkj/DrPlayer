@@ -333,7 +333,11 @@ const goToDetail = async (item) => {
           // 传递历史记录信息，用于恢复播放状态
           historyRoute: item.current_route,
           historyEpisode: item.current_episode,
-          historyProgress: item.progress || 0
+          historyProgress: item.progress || 0,
+          // 添加来源页面信息
+          sourceRouteName: 'History',
+          sourceRouteParams: JSON.stringify({}),
+          sourceRouteQuery: JSON.stringify({})
         }
     })
   } catch (error) {
@@ -360,7 +364,10 @@ const showImageModal = (item) => {
 }
 
 const handleImageError = (event) => {
-  event.target.src = '/placeholder-image.jpg'
+  // 使用相对路径，适配子目录部署
+  event.target.src = './default-poster.svg'
+  event.target.style.objectFit = 'contain'
+  event.target.style.backgroundColor = '#f7f8fa'
 }
 
 const formatDate = (dateString) => {

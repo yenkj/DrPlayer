@@ -218,6 +218,7 @@ import videoService from '@/api/services/video'
 import { useSiteStore } from '@/stores/siteStore'
 import { useFavoriteStore } from '@/stores/favoriteStore'
 import { useHistoryStore } from '@/stores/historyStore'
+import { usePageStateStore } from '@/stores/pageStateStore'
 import { 
   IconLeft, 
   IconPlayArrow, 
@@ -235,6 +236,7 @@ const router = useRouter()
 const siteStore = useSiteStore()
 const favoriteStore = useFavoriteStore()
 const historyStore = useHistoryStore()
+const pageStateStore = usePageStateStore()
 
 // 响应式数据
 const loading = ref(false)
@@ -468,11 +470,78 @@ const toggleFavorite = async () => {
 }
 
 const goBack = () => {
-  router.back()
+  // 检查是否有来源页面信息
+  const sourceRouteName = route.query.sourceRouteName
+  const sourceRouteParams = route.query.sourceRouteParams
+  const sourceRouteQuery = route.query.sourceRouteQuery
+  const fromSearch = route.query.fromSearch // 新增：标识是否来自搜索
+  
+  console.log('goBack 调用，来源信息:', { sourceRouteName, fromSearch, sourceRouteParams, sourceRouteQuery });
+  
+  if (sourceRouteName) {
+    try {
+      // 解析来源页面的参数和查询
+      const params = sourceRouteParams ? JSON.parse(sourceRouteParams) : {}
+      const query = sourceRouteQuery ? JSON.parse(sourceRouteQuery) : {}
+      
+      console.log('返回来源页面:', sourceRouteName, { params, query, fromSearch });
+      
+      // 根据来源页面类型和是否来自搜索处理状态恢复
+      if (sourceRouteName === 'Video') {
+        if (fromSearch === 'true') {
+          // 来自Video页面的搜索结果，需要恢复搜索状态
+          console.log('从Video页面搜索返回，恢复搜索状态');
+          const savedSearchState = pageStateStore.getPageState('search');
+          if (savedSearchState && savedSearchState.keyword && !pageStateStore.isStateExpired('search')) {
+            console.log('发现保存的搜索状态，将恢复搜索结果:', savedSearchState);
+            // 添加搜索恢复标识
+            query._restoreSearch = 'true';
+          }
+        } else {
+          // 来自Video页面的分类列表，恢复分类状态
+          console.log('从Video页面分类返回，恢复分类状态');
+          if (query.activeKey) {
+            query._returnToActiveKey = query.activeKey;
+            console.log('设置返回分类:', query.activeKey);
+          }
+          
+          // 检查是否有保存的Video页面状态
+          const savedVideoState = pageStateStore.getPageState('video');
+          if (savedVideoState && !pageStateStore.isStateExpired('video')) {
+            console.log('发现保存的Video页面状态，将恢复状态而非重新加载');
+          }
+        }
+      } else if (sourceRouteName === 'Home') {
+        // 返回Home页面，检查搜索状态
+        const savedSearchState = pageStateStore.getPageState('search');
+        if (savedSearchState && savedSearchState.keyword && !pageStateStore.isStateExpired('search')) {
+          console.log('发现保存的搜索状态，将恢复搜索结果');
+          // 添加搜索恢复标识
+          query._restoreSearch = 'true';
+        }
+      }
+      
+      // 跳转到来源页面
+      router.push({
+        name: sourceRouteName,
+        params: params,
+        query: query
+      })
+    } catch (error) {
+      console.error('解析来源页面信息失败:', error)
+      // 如果解析失败，使用默认的返回方式
+      router.back()
+    }
+  } else {
+    console.log('没有来源信息，使用默认返回方式')
+    // 没有来源信息，使用默认的返回方式
+    router.back()
+  }
 }
 
 const handleImageError = (event) => {
-  event.target.src = '/default-poster.svg'
+  // 使用相对路径，适配子目录部署
+  event.target.src = './default-poster.svg'
   event.target.style.objectFit = 'contain'
   event.target.style.backgroundColor = '#f7f8fa'
 }
