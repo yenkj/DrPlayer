@@ -6,6 +6,7 @@
     @maximize="maximize"
     @closeWindow="closeWindow"
     @onSearch="onSearch"
+    @handlePush="handlePush"
     :now_site_title="form.now_site_title"
   >
     <!-- 默认插槽的内容放这里 -->
@@ -70,6 +71,7 @@ import { useSiteStore } from "@/stores/siteStore";
 import { usePaginationStore } from "@/stores/paginationStore";
 import { usePageStateStore } from "@/stores/pageStateStore";
 import { useRoute, useRouter } from "vue-router";
+import { Message } from "@arco-design/web-vue";
 
 const { nowSite, setCurrentSite } = useSiteStore();
 const paginationStore = usePaginationStore();
@@ -405,6 +407,64 @@ const handleOpenForm = () => {
   form.visible = true;
   form.form_title = `请选择数据源(${form.sites.length})`;
   checkNowSite();
+};
+
+// 处理推送功能
+const handlePush = async (vodId) => {
+  if (!vodId || !vodId.trim()) {
+    Message.error("推送内容不能为空");
+    return;
+  }
+
+  // 检查是否存在push_agent源
+  const pushAgentSite = form.sites.find(site => site.key === 'push_agent');
+  
+  if (!pushAgentSite) {
+    Message.error("没有找到push_agent服务，请检查源配置");
+    return;
+  }
+
+  try {
+    console.log('推送功能，使用临时站源:', {
+      siteName: pushAgentSite.name,
+      siteKey: pushAgentSite.key,
+      siteApi: pushAgentSite.api
+    });
+
+    // 参考收藏和历史功能，使用临时源跳转到详情页
+    router.push({
+      name: 'VideoDetail',
+      params: { id: vodId.trim() },
+      query: {
+        // 基本视频信息（推送时可能没有完整信息）
+        name: `推送内容-${vodId.trim()}`,
+        pic: '',
+        year: '',
+        area: '',
+        type: '',
+        type_name: '',
+        remarks: '',
+        content: '',
+        actor: '',
+        director: '',
+        // 标识从推送进入，使用临时站源
+        fromPush: 'true',
+        // 传递push_agent站源信息，不影响全局状态
+        tempSiteName: pushAgentSite.name,
+        tempSiteApi: pushAgentSite.api,
+        tempSiteKey: pushAgentSite.key,
+        // 传递来源页面信息
+        sourceRouteName: route.name,
+        sourceRouteParams: JSON.stringify(route.params),
+        sourceRouteQuery: JSON.stringify(route.query)
+      }
+    });
+    
+    Message.success(`正在推送内容: ${vodId.trim()}`);
+  } catch (error) {
+    console.error("推送失败:", error);
+    Message.error("推送失败，请重试");
+  }
 };
 
 // 页面加载时获取数据

@@ -12,8 +12,8 @@
         <span v-if="!originalVideoInfo.name">视频详情</span>
         <span v-else class="title-with-info">
           <span class="title-main">视频详情 - {{ originalVideoInfo.name }}</span>
-          <span class="title-source" v-if="siteStore.nowSite">
-            ({{ siteStore.nowSite.name }} - ID: {{ originalVideoInfo.id }})
+          <span class="title-source" v-if="currentSiteInfo.name">
+            ({{ currentSiteInfo.name }} - ID: {{ originalVideoInfo.id }})
           </span>
         </span>
       </div>
@@ -413,19 +413,23 @@ const loadVideoDetail = async () => {
   loading.value = true
   error.value = ''
   
-  // 检查是否从收藏进入，如果是则优先调用T4详情接口获取最新数据
+  // 检查是否从收藏、历史或推送进入，如果是则优先调用T4详情接口获取最新数据
   const fromCollection = route.query.fromCollection === 'true'
+  const fromHistory = route.query.fromHistory === 'true'
+  const fromPush = route.query.fromPush === 'true'
   
   try {
     // 确定使用的站源信息
     let module, apiUrl, siteName
     
-    if (fromCollection && route.query.tempSiteKey) {
-      // 从收藏进入，使用临时站源信息，不影响全局状态
+    if ((fromCollection || fromHistory || fromPush) && route.query.tempSiteKey) {
+      // 从收藏、历史或推送进入，使用临时站源信息，不影响全局状态
       module = route.query.tempSiteKey
       apiUrl = route.query.tempSiteApi
       siteName = route.query.tempSiteName
-      console.log('从收藏进入，使用临时站源:', {
+      
+      const sourceType = fromCollection ? '收藏' : fromHistory ? '历史' : '推送'
+      console.log(`从${sourceType}进入，使用临时站源:`, {
         siteName,
         module,
         apiUrl
