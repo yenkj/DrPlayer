@@ -35,6 +35,12 @@
               </template>
               导出收藏
             </a-doption>
+            <a-doption value="manage-api">
+              <template #icon>
+                <icon-settings />
+              </template>
+              API地址管理
+            </a-doption>
             <a-doption value="clear" class="danger-option">
               <template #icon>
                 <icon-delete />
@@ -94,6 +100,12 @@
       </div>
     </div>
 
+    <!-- API地址管理组件 -->
+    <ApiUrlManager
+      v-model="showApiManager"
+      @completed="handleApiManagerCompleted"
+    />
+
     <!-- 导入文件输入 -->
     <input
       ref="fileInput"
@@ -124,6 +136,7 @@ import { Message, Modal } from '@arco-design/web-vue'
 import { useFavoriteStore } from '@/stores/favoriteStore'
 import { useSiteStore } from '@/stores/siteStore'
 import VideoCard from '@/components/VideoCard.vue'
+import ApiUrlManager from '@/components/ApiUrlManager.vue'
 import {
   IconHeart,
   IconHeartFill,
@@ -131,6 +144,7 @@ import {
   IconMore,
   IconImport,
   IconExport,
+  IconSettings,
   IconDelete,
   IconLink,
   IconEye
@@ -144,6 +158,7 @@ const siteStore = useSiteStore()
 const searchKeyword = ref('')
 const selectedCategory = ref('all')
 const fileInput = ref(null)
+const showApiManager = ref(false)
 const viewerImages = ref([])
 const viewerImageData = ref([])
 
@@ -249,6 +264,9 @@ const handleAction = (value) => {
       break
     case 'export':
       exportFavorites()
+      break
+    case 'manage-api':
+      showApiManager.value = true
       break
     case 'clear':
       clearAllFavorites()
@@ -366,6 +384,12 @@ const goToDetail = async (item) => {
 
 const goToVideo = () => {
   router.push('/video')
+}
+
+const handleApiManagerCompleted = (result) => {
+  console.log('API地址管理完成:', result)
+  Message.success(`API地址管理完成，共处理 ${result.replacedCount} 条记录`)
+  // 可以在这里添加其他后续处理逻辑
 }
 
 const handleImageError = (event) => {
