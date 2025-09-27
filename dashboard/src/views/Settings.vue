@@ -16,7 +16,7 @@
         <div class="address-settings-section">
           <!-- 点播配置 -->
           <div class="address-config-item">
-            <div class="address-config-header">
+            <div class="address-config-row">
               <div class="address-config-info">
                 <icon-play-circle class="address-config-icon" />
                 <div class="address-config-text">
@@ -24,46 +24,46 @@
                   <div class="address-config-desc">配置点播视频数据源地址</div>
                 </div>
               </div>
-            </div>
-            <div class="address-config-input-group">
-              <a-input 
-                v-model="addressSettings.vodConfig" 
-                placeholder="请输入点播配置地址 (如: https://example.com/config.json)"
-                size="large"
-                class="address-config-input"
-              >
-                <template #prefix>
-                  <icon-link />
-                </template>
-              </a-input>
-              <div class="address-config-actions">
-                <AddressHistory 
-                  config-key="vod-config"
-                  :current-value="addressSettings.vodConfig"
-                  @select="(value) => addressSettings.vodConfig = value"
-                />
-                <a-button 
-                  type="outline" 
-                  @click="testAddress('vodConfig')"
-                  :loading="addressTesting.vodConfig"
-                  size="large"
+              <div class="address-config-input-group">
+                <a-input 
+                  v-model="addressSettings.vodConfig" 
+                  placeholder="请输入点播配置地址"
+                  size="medium"
+                  class="address-config-input"
                 >
-                  <template #icon>
-                    <icon-check-circle />
+                  <template #prefix>
+                    <icon-link />
                   </template>
-                  测试
-                </a-button>
-                <a-button 
-                  type="primary" 
-                  @click="saveAddress('vodConfig')"
-                  :loading="addressSaving.vodConfig"
-                  size="large"
-                >
-                  <template #icon>
-                    <icon-save />
-                  </template>
-                  保存
-                </a-button>
+                </a-input>
+                <div class="address-config-actions">
+                  <AddressHistory 
+                    config-key="vod-config"
+                    :current-value="addressSettings.vodConfig"
+                    @select="(value) => addressSettings.vodConfig = value"
+                  />
+                  <a-button 
+                    type="outline" 
+                    @click="testAddress('vodConfig')"
+                    :loading="addressTesting.vodConfig"
+                    size="medium"
+                  >
+                    <template #icon>
+                      <icon-check-circle />
+                    </template>
+                    测试
+                  </a-button>
+                  <a-button 
+                    type="primary" 
+                    @click="saveAddress('vodConfig')"
+                    :loading="addressSaving.vodConfig"
+                    size="medium"
+                  >
+                    <template #icon>
+                      <icon-save />
+                    </template>
+                    保存
+                  </a-button>
+                </div>
               </div>
             </div>
             <div v-if="addressStatus.vodConfig && addressStatus.vodConfig.message" class="address-config-status">
@@ -85,7 +85,7 @@
 
           <!-- 直播配置 -->
           <div class="address-config-item">
-            <div class="address-config-header">
+            <div class="address-config-row">
               <div class="address-config-info">
                 <icon-live-broadcast class="address-config-icon" />
                 <div class="address-config-text">
@@ -93,35 +93,35 @@
                   <div class="address-config-desc">配置直播频道数据源地址</div>
                 </div>
               </div>
-            </div>
-            <div class="address-config-input-group">
-              <a-input 
-                v-model="addressSettings.liveConfig" 
-                placeholder="请输入直播配置地址 (如: https://example.com/live.json)"
-                size="large"
-                class="address-config-input"
-              >
-                <template #prefix>
-                  <icon-link />
-                </template>
-              </a-input>
-              <div class="address-config-actions">
-                <AddressHistory 
-                  config-key="live-config"
-                  :current-value="addressSettings.liveConfig"
-                  @select="(value) => addressSettings.liveConfig = value"
-                />
-                <a-button 
-                  type="primary" 
-                  @click="saveAddress('liveConfig')"
-                  :loading="addressSaving.liveConfig"
-                  size="large"
+              <div class="address-config-input-group">
+                <a-input 
+                  v-model="addressSettings.liveConfig" 
+                  placeholder="请输入直播配置地址"
+                  size="medium"
+                  class="address-config-input"
                 >
-                  <template #icon>
-                    <icon-save />
+                  <template #prefix>
+                    <icon-link />
                   </template>
-                  保存
-                </a-button>
+                </a-input>
+                <div class="address-config-actions">
+                  <AddressHistory 
+                    config-key="live-config"
+                    :current-value="addressSettings.liveConfig"
+                    @select="(value) => addressSettings.liveConfig = value"
+                  />
+                  <a-button 
+                    type="primary" 
+                    @click="saveAddress('liveConfig')"
+                    :loading="addressSaving.liveConfig"
+                    size="medium"
+                  >
+                    <template #icon>
+                      <icon-save />
+                    </template>
+                    保存
+                  </a-button>
+                </div>
               </div>
             </div>
             <div v-if="addressStatus.liveConfig && addressStatus.liveConfig.message" class="address-config-status">
@@ -143,7 +143,7 @@
 
           <!-- 代理访问接口 -->
           <div class="address-config-item">
-            <div class="address-config-header">
+            <div class="address-config-row">
               <div class="address-config-info">
                 <icon-swap class="address-config-icon" />
                 <div class="address-config-text">
@@ -151,38 +151,38 @@
                   <div class="address-config-desc">配置代理访问服务接口地址</div>
                 </div>
               </div>
-              <a-switch v-model="addressSettings.proxyAccessEnabled" />
-            </div>
-            <div class="address-config-input-group">
-              <a-input 
-                v-model="addressSettings.proxyAccess" 
-                placeholder="请输入代理访问接口地址 (如: https://proxy.example.com/access)"
-                size="large"
-                class="address-config-input"
-                :disabled="!addressSettings.proxyAccessEnabled"
-              >
-                <template #prefix>
-                  <icon-link />
-                </template>
-              </a-input>
-              <div class="address-config-actions">
-                <AddressHistory 
-                  config-key="proxy-access"
-                  :current-value="addressSettings.proxyAccess"
-                  @select="(value) => addressSettings.proxyAccess = value"
-                />
-                <a-button 
-                  type="primary" 
-                  @click="saveAddress('proxyAccess')"
-                  :loading="addressSaving.proxyAccess"
+              <div class="address-config-input-group">
+                <a-switch v-model="addressSettings.proxyAccessEnabled" class="address-config-switch" />
+                <a-input 
+                  v-model="addressSettings.proxyAccess" 
+                  placeholder="请输入代理访问接口地址"
+                  size="medium"
+                  class="address-config-input"
                   :disabled="!addressSettings.proxyAccessEnabled"
-                  size="large"
                 >
-                  <template #icon>
-                    <icon-save />
+                  <template #prefix>
+                    <icon-link />
                   </template>
-                  保存
-                </a-button>
+                </a-input>
+                <div class="address-config-actions">
+                  <AddressHistory 
+                    config-key="proxy-access"
+                    :current-value="addressSettings.proxyAccess"
+                    @select="(value) => addressSettings.proxyAccess = value"
+                  />
+                  <a-button 
+                    type="primary" 
+                    @click="saveAddress('proxyAccess')"
+                    :loading="addressSaving.proxyAccess"
+                    :disabled="!addressSettings.proxyAccessEnabled"
+                    size="medium"
+                  >
+                    <template #icon>
+                      <icon-save />
+                    </template>
+                    保存
+                  </a-button>
+                </div>
               </div>
             </div>
             <div v-if="addressStatus.proxyAccess && addressStatus.proxyAccess.message" class="address-config-status">
@@ -204,7 +204,7 @@
 
           <!-- 代理播放接口 -->
           <div class="address-config-item">
-            <div class="address-config-header">
+            <div class="address-config-row">
               <div class="address-config-info">
                 <icon-play-arrow class="address-config-icon" />
                 <div class="address-config-text">
@@ -212,38 +212,38 @@
                   <div class="address-config-desc">配置代理播放服务接口地址</div>
                 </div>
               </div>
-              <a-switch v-model="addressSettings.proxyPlayEnabled" />
-            </div>
-            <div class="address-config-input-group">
-              <a-input 
-                v-model="addressSettings.proxyPlay" 
-                placeholder="请输入代理播放接口地址 (如: https://proxy.example.com/play)"
-                size="large"
-                class="address-config-input"
-                :disabled="!addressSettings.proxyPlayEnabled"
-              >
-                <template #prefix>
-                  <icon-link />
-                </template>
-              </a-input>
-              <div class="address-config-actions">
-                <AddressHistory 
-                  config-key="proxy-play"
-                  :current-value="addressSettings.proxyPlay"
-                  @select="(value) => addressSettings.proxyPlay = value"
-                />
-                <a-button 
-                  type="primary" 
-                  @click="saveAddress('proxyPlay')"
-                  :loading="addressSaving.proxyPlay"
+              <div class="address-config-input-group">
+                <a-switch v-model="addressSettings.proxyPlayEnabled" class="address-config-switch" />
+                <a-input 
+                  v-model="addressSettings.proxyPlay" 
+                  placeholder="请输入代理播放接口地址"
+                  size="medium"
+                  class="address-config-input"
                   :disabled="!addressSettings.proxyPlayEnabled"
-                  size="large"
                 >
-                  <template #icon>
-                    <icon-save />
+                  <template #prefix>
+                    <icon-link />
                   </template>
-                  保存
-                </a-button>
+                </a-input>
+                <div class="address-config-actions">
+                  <AddressHistory 
+                    config-key="proxy-play"
+                    :current-value="addressSettings.proxyPlay"
+                    @select="(value) => addressSettings.proxyPlay = value"
+                  />
+                  <a-button 
+                    type="primary" 
+                    @click="saveAddress('proxyPlay')"
+                    :loading="addressSaving.proxyPlay"
+                    :disabled="!addressSettings.proxyPlayEnabled"
+                    size="medium"
+                  >
+                    <template #icon>
+                      <icon-save />
+                    </template>
+                    保存
+                  </a-button>
+                </div>
               </div>
             </div>
             <div v-if="addressStatus.proxyPlay && addressStatus.proxyPlay.message" class="address-config-status">
@@ -265,7 +265,7 @@
 
           <!-- 代理嗅探接口 -->
           <div class="address-config-item">
-            <div class="address-config-header">
+            <div class="address-config-row">
               <div class="address-config-info">
                 <icon-search class="address-config-icon" />
                 <div class="address-config-text">
@@ -273,38 +273,38 @@
                   <div class="address-config-desc">配置代理嗅探服务接口地址</div>
                 </div>
               </div>
-              <a-switch v-model="addressSettings.proxySniffEnabled" />
-            </div>
-            <div class="address-config-input-group">
-              <a-input 
-                v-model="addressSettings.proxySniff" 
-                placeholder="请输入代理嗅探接口地址 (如: https://proxy.example.com/sniff)"
-                size="large"
-                class="address-config-input"
-                :disabled="!addressSettings.proxySniffEnabled"
-              >
-                <template #prefix>
-                  <icon-link />
-                </template>
-              </a-input>
-              <div class="address-config-actions">
-                <AddressHistory 
-                  config-key="proxy-sniff"
-                  :current-value="addressSettings.proxySniff"
-                  @select="(value) => addressSettings.proxySniff = value"
-                />
-                <a-button 
-                  type="primary" 
-                  @click="saveAddress('proxySniff')"
-                  :loading="addressSaving.proxySniff"
+              <div class="address-config-input-group">
+                <a-switch v-model="addressSettings.proxySniffEnabled" class="address-config-switch" />
+                <a-input 
+                  v-model="addressSettings.proxySniff" 
+                  placeholder="请输入代理嗅探接口地址"
+                  size="medium"
+                  class="address-config-input"
                   :disabled="!addressSettings.proxySniffEnabled"
-                  size="large"
                 >
-                  <template #icon>
-                    <icon-save />
+                  <template #prefix>
+                    <icon-link />
                   </template>
-                  保存
-                </a-button>
+                </a-input>
+                <div class="address-config-actions">
+                  <AddressHistory 
+                    config-key="proxy-sniff"
+                    :current-value="addressSettings.proxySniff"
+                    @select="(value) => addressSettings.proxySniff = value"
+                  />
+                  <a-button 
+                    type="primary" 
+                    @click="saveAddress('proxySniff')"
+                    :loading="addressSaving.proxySniff"
+                    :disabled="!addressSettings.proxySniffEnabled"
+                    size="medium"
+                  >
+                    <template #icon>
+                      <icon-save />
+                    </template>
+                    保存
+                  </a-button>
+                </div>
               </div>
             </div>
             <div v-if="addressStatus.proxySniff && addressStatus.proxySniff.message" class="address-config-status">
@@ -419,7 +419,7 @@
               </div>
             </div>
             <div class="setting-value">
-              <span class="value-text">IJK</span>
+              <span class="value-text">{{ getCurrentPlayerName() }}</span>
               <icon-right class="arrow-icon" />
             </div>
           </div>
@@ -659,6 +659,14 @@
         </div>
       </a-card>
     </div>
+    
+    <!-- 播放器选择对话框 -->
+    <PlayerSelector
+      v-model:visible="playerSelectVisible"
+      :player-types="playerTypes"
+      :current-player="settings.playerType"
+      @confirm="handlePlayerSelect"
+    />
   </div>
 </template>
 
@@ -691,6 +699,7 @@ import {
   IconExclamationCircle
 } from '@arco-design/web-vue/es/icon'
 import AddressHistory from '@/components/AddressHistory.vue'
+import PlayerSelector from '@/components/PlayerSelector.vue'
 
 // 地址设置相关
 const addressSettings = reactive({
@@ -724,15 +733,28 @@ const addressStatus = reactive({
   proxySniff: null
 })
 
+// 播放器类型选项
+const playerTypes = [
+  { value: 'art', label: 'Art Player', description: '现代化的HTML5播放器' },
+  { value: 'ijk', label: 'IJK Player', description: '基于FFmpeg的播放器' },
+  { value: 'exo', label: 'Exo Player', description: 'Google开发的Android播放器' },
+  { value: 'mpv', label: 'MPV Player', description: '轻量级的媒体播放器' },
+  { value: 'vlc', label: 'VLC Player', description: '功能强大的多媒体播放器' }
+]
+
 // 设置项状态
 const settings = reactive({
   datasourceDisplay: true,
   windowPreview: true,
+  playerType: 'ijk', // 默认播放器类型
   adFilter: true,
   ijkCache: false,
   autoLive: false,
   secureDns: false
 })
+
+// 播放器选择对话框状态
+const playerSelectVisible = ref(false)
 
 // 保存地址配置
 const saveAddress = async (configType) => {
@@ -845,12 +867,45 @@ const getConfigKey = (configType) => {
   return keyMap[configType] || configType
 }
 
+// 获取当前播放器名称
+const getCurrentPlayerName = () => {
+  const currentPlayer = playerTypes.find(player => player.value === settings.playerType)
+  return currentPlayer ? currentPlayer.label : 'IJK Player'
+}
+
+// 处理播放器选择
+const handlePlayerSelect = (playerType) => {
+  settings.playerType = playerType
+  Message.success(`已切换到 ${getCurrentPlayerName()}`)
+}
+
 // 处理设置项点击
 const handleSettingClick = (settingKey) => {
   console.log('Setting clicked:', settingKey)
-  Message.info(`点击了设置项：${settingKey}`)
-  // 这里可以根据不同的设置项执行不同的操作
-  // 比如打开对话框、跳转页面等
+  
+  switch (settingKey) {
+    case 'player-type':
+      playerSelectVisible.value = true
+      break
+    case 'window-preview':
+      Message.info('窗口预览设置')
+      break
+    case 'ijk-decode':
+      Message.info('IJK解码设置')
+      break
+    case 'ad-filter':
+      Message.info('广告过滤设置')
+      break
+    case 'ijk-cache':
+      Message.info('IJK缓存设置')
+      break
+    case 'auto-live':
+      Message.info('启动时进直播设置')
+      break
+    default:
+      Message.info(`点击了设置项：${settingKey}`)
+      break
+  }
 }
 
 // 页面加载时从配置服务恢复配置
@@ -883,6 +938,10 @@ const loadConfig = async () => {
     try {
       const parsed = JSON.parse(savedSettings)
       Object.assign(settings, parsed)
+      // 确保播放器类型有默认值
+      if (!settings.playerType) {
+        settings.playerType = 'ijk'
+      }
     } catch (error) {
       console.error('Failed to load settings:', error)
     }
@@ -1245,11 +1304,11 @@ loadConfig()
 .address-settings-section {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .address-config-item {
-  padding: 20px;
+  padding: 16px;
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(0, 0, 0, 0.05);
   border-radius: 12px;
@@ -1263,22 +1322,22 @@ loadConfig()
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
-.address-config-header {
+.address-config-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
+  gap: 16px;
 }
 
 .address-config-info {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 1;
+  min-width: 200px;
+  flex-shrink: 0;
 }
 
 .address-config-icon {
-  font-size: 20px;
+  font-size: 18px;
   color: #6366f1;
   background: rgba(99, 102, 241, 0.1);
   padding: 8px;
@@ -1293,7 +1352,7 @@ loadConfig()
 }
 
 .address-config-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: #1e293b;
   line-height: 1.2;
@@ -1309,12 +1368,16 @@ loadConfig()
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
+  flex: 1;
+}
+
+.address-config-switch {
+  flex-shrink: 0;
 }
 
 .address-config-input {
   flex: 1;
-  min-width: 0;
+  min-width: 200px;
 }
 
 .address-config-input :deep(.arco-input) {
@@ -1372,11 +1435,11 @@ loadConfig()
   margin-top: 8px;
 }
 
-.address-config-header :deep(.arco-switch) {
+.address-config-switch :deep(.arco-switch) {
   background: #e2e8f0;
 }
 
-.address-config-header :deep(.arco-switch.arco-switch-checked) {
+.address-config-switch :deep(.arco-switch.arco-switch-checked) {
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
 }
 
