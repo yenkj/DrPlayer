@@ -343,8 +343,16 @@ class LiveService {
 
     for (const line of lines) {
       if (line.includes('#genre#')) {
-        // 分组标记
-        currentGroupName = line.replace('#genre#', '').trim()
+        // 分组标记 - 格式为 "分组名称,#genre#"
+        const genreIndex = line.indexOf('#genre#')
+        if (genreIndex > 0) {
+          // 提取逗号前的分组名称
+          currentGroupName = line.substring(0, genreIndex).replace(/,$/, '').trim()
+        } else {
+          // 兼容其他可能的格式
+          currentGroupName = line.replace('#genre#', '').trim()
+        }
+        
         if (!groups.has(currentGroupName)) {
           groups.set(currentGroupName, {
             name: currentGroupName,
