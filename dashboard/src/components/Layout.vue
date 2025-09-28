@@ -109,6 +109,7 @@ export default defineComponent({
       {id: 6, name: '解析', icon: 'icon-yumingjiexi', route: '/parser'},
       {id: 7, name: '收藏', icon: 'icon-shoucang', route: '/collection'},
       {id: 8, name: '历史', icon: 'icon-lishi', route: '/history'},
+      {id: 10, name: '测试', icon: 'icon-ceshi', route: '/action-test'},
       {id: 9, name: '设置', icon: 'icon-shezhi', route: '/settings'}
     ]);
     const logoSrc = ref(logo);
