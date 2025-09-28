@@ -130,16 +130,24 @@ const updateScrollAreaHeight = () => {
       const container = containerRef.value;
       if (!container) return;
 
-      // 参考mock版本的实现，查找父级内容区域
+      // 查找父级内容区域
       const contentArea = container.closest('.content-area') || container.parentElement;
       const footer = container.querySelector('.stats-footer');
       const footerHeight = (props.showStats && footer) ? footer.offsetHeight : 0;
 
+      // 查找CategoryNavigation组件来获取其实际高度
+      const categoryNav = document.querySelector('.category-nav-container');
+      const categoryNavHeight = categoryNav ? categoryNav.offsetHeight : 0;
+
       let containerHeight = contentArea ? contentArea.offsetHeight : 0;
       if (containerHeight <= 0) {
         // 备用方案：使用窗口高度减去导航栏等固定元素高度
-        containerHeight = Math.max(window.innerHeight - 120, 500);
+        // 考虑到CategoryNavigation的高度变化
+        const baseHeight = Math.max(window.innerHeight - 120, 500);
+        containerHeight = baseHeight;
       }
+
+      console.log(`CategoryNavigation高度: ${categoryNavHeight}px, 内容区域高度: ${containerHeight}px`);
 
       // 改进的高度计算逻辑：
       // 1. 正确计算网格列数（基于容器宽度）
@@ -155,27 +163,32 @@ const updateScrollAreaHeight = () => {
       
       const estimatedItemHeight = 328; // 根据F12实际测量的高度（图片+文字）
       const estimatedRows = videoCount > 0 ? Math.ceil(videoCount / Math.max(gridCols, 1)) : 0;
-      const estimatedContentHeight = estimatedRows * estimatedItemHeight + 80; // 减少padding估算
+      const estimatedContentHeight = estimatedRows * estimatedItemHeight + 16; // 减少padding估算
       
-      // 智能高度调整策略
+      // 智能高度调整策略 - 考虑CategoryNavigation的动态高度
       let heightReduction = 4; // 默认只减去少量padding
       
       // 如果没有视频数据，使用保守的高度减值来为后续数据加载预留空间
       if (videoCount === 0) {
-        heightReduction = Math.min(containerHeight * 0.3, 200); // 减去30%或200px，取较小值
+        // 对于空数据，需要确保有足够的滚动空间来触发翻页
+        // 减去更多高度以确保滚动条出现
+        heightReduction = Math.min(containerHeight * 0.4, 300); // 增加减值比例
         console.log(`无视频数据，使用保守高度减值: ${heightReduction}px`);
       } else if (estimatedContentHeight < containerHeight) {
         // 有数据但内容不足时，需要减少容器高度以触发滚动
-        // 策略：容器高度 = 内容高度 - 120px（确保有足够滚动空间）
-        // 但如果这样会遮挡太多内容，则至少显示1.5行的高度
-        const minDisplayHeight = Math.floor(estimatedItemHeight * 1.5) + 80; // 至少显示1.5行
-        const idealHeight = estimatedContentHeight - 120; // 理想的滚动高度
-        const targetHeight = Math.max(idealHeight, minDisplayHeight, containerHeight * 0.4); // 取最大值确保不会太小
-        heightReduction = Math.max(containerHeight - targetHeight, 80); // 最少减去80px
+        // 策略：容器高度 = 内容高度 - 150px（确保有足够滚动空间）
+        const minDisplayHeight = Math.floor(estimatedItemHeight * 1.2) + 60; // 至少显示1.2行
+        const idealHeight = estimatedContentHeight - 5; // 增加滚动空间
+        const targetHeight = Math.max(idealHeight, minDisplayHeight, containerHeight * 0.3); // 降低最小比例
+        heightReduction = Math.max(containerHeight - targetHeight, 50); // 增加最小减值
         console.log(`内容高度不足，估算内容高度: ${estimatedContentHeight}px, 理想高度: ${idealHeight}px, 最小显示高度: ${minDisplayHeight}px, 容器高度: ${containerHeight}px, 调整高度减值: ${heightReduction}px`);
+      } else {
+        // 内容充足时，减少一些高度确保滚动正常
+        heightReduction = Math.min(containerHeight * 0.02, 20);
+        console.log(`内容充足，使用标准高度减值: ${heightReduction}px`);
       }
       
-      const newHeight = Math.max(containerHeight - footerHeight - heightReduction, 300);
+      const newHeight = Math.max(containerHeight - footerHeight - heightReduction, 250); // 降低最小高度
       console.log(`视频数量: ${videoCount}, 估算行数: ${estimatedRows}, 列数: ${gridCols}, 容器宽度: ${containerWidth}px, 最终高度: ${newHeight}px`);
       scrollAreaHeight.value = newHeight;
     }, 100); // 增加延迟确保DOM完全渲染
@@ -223,10 +236,41 @@ onMounted(() => {
   checkTextOverflow();
   updateScrollAreaHeight();
   window.addEventListener('resize', updateScrollAreaHeight);
+  
+  // 监听筛选组件的高度变化
+  const observeFilterChanges = () => {
+    const categoryNav = document.querySelector('.category-nav-container');
+    if (categoryNav) {
+      const observer = new MutationObserver(() => {
+        // 延迟执行以确保DOM更新完成
+        setTimeout(() => {
+          updateScrollAreaHeight();
+        }, 100);
+      });
+      
+      observer.observe(categoryNav, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class', 'style']
+      });
+      
+      // 保存observer引用以便清理
+      containerRef.value._filterObserver = observer;
+    }
+  };
+  
+  // 延迟执行以确保DOM完全渲染
+  setTimeout(observeFilterChanges, 200);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateScrollAreaHeight);
+  
+  // 清理MutationObserver
+  if (containerRef.value?._filterObserver) {
+    containerRef.value._filterObserver.disconnect();
+  }
 });
 
 // 当视频数据或显示统计信息变化时，更新高度和检测文本溢出
