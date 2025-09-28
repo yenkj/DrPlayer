@@ -111,6 +111,17 @@
                     @select="(value) => addressSettings.liveConfig = value"
                   />
                   <a-button 
+                    type="outline" 
+                    @click="resetLiveConfig"
+                    :loading="addressSaving.liveConfigReset"
+                    size="medium"
+                  >
+                    <template #icon>
+                      <icon-refresh />
+                    </template>
+                    重置
+                  </a-button>
+                  <a-button 
                     type="primary" 
                     @click="saveAddress('liveConfig')"
                     :loading="addressSaving.liveConfig"
@@ -696,7 +707,8 @@ import {
   IconSwap,
   IconPlayArrow,
   IconSearch,
-  IconExclamationCircle
+  IconExclamationCircle,
+  IconRefresh
 } from '@arco-design/web-vue/es/icon'
 import AddressHistory from '@/components/AddressHistory.vue'
 import PlayerSelector from '@/components/PlayerSelector.vue'
@@ -716,6 +728,7 @@ const addressSettings = reactive({
 const addressSaving = reactive({
   vodConfig: false,
   liveConfig: false,
+  liveConfigReset: false,
   proxyAccess: false,
   proxyPlay: false,
   proxySniff: false
@@ -779,11 +792,48 @@ const saveAddress = async (configType) => {
     
     localStorage.setItem('addressSettings', JSON.stringify(savedAddresses))
     
+    // 如果是点播配置，尝试使用配置服务设置地址并自动设置直播配置地址
+    if (configType === 'vodConfig') {
+      try {
+        const configService = (await import('@/api/services/config')).default
+        await configService.setConfigUrl(addressValue)
+        
+        // 检查是否自动设置了直播配置地址
+        const liveConfigUrl = configService.getLiveConfigUrl()
+        if (liveConfigUrl && liveConfigUrl !== addressSettings.liveConfig) {
+          // 更新界面显示的直播配置地址
+          addressSettings.liveConfig = liveConfigUrl
+          
+          // 同步保存到本地存储
+          savedAddresses.liveConfig = liveConfigUrl
+          localStorage.setItem('addressSettings', JSON.stringify(savedAddresses))
+          
+          Message.success('点播配置保存成功，已自动设置直播配置地址')
+        } else {
+          Message.success('点播配置保存成功')
+        }
+      } catch (error) {
+        console.error('设置配置服务失败:', error)
+        Message.success('地址保存成功，但配置服务设置失败')
+      }
+    } else if (configType === 'liveConfig') {
+      // 如果是直播配置，使用配置服务设置直播配置地址
+      try {
+        const configService = (await import('@/api/services/config')).default
+        await configService.setLiveConfigUrl(addressValue)
+        Message.success('直播配置地址保存成功')
+      } catch (error) {
+        console.error('设置直播配置服务失败:', error)
+        Message.success('地址保存成功，但配置服务设置失败')
+      }
+    } else {
+      Message.success('地址保存成功')
+    }
+    
     addressStatus[configType] = {
       type: 'success',
       message: '地址保存成功'
     }
-    Message.success('地址保存成功')
     
     // 添加到历史记录
     const historyComponent = document.querySelector(`[config-key="${getConfigKey(configType)}"]`)
@@ -851,6 +901,52 @@ const testAddress = async (configType) => {
     // 8秒后清除状态消息
     setTimeout(() => {
       addressStatus[configType] = null
+    }, 8000)
+  }
+}
+
+// 重置直播配置地址
+const resetLiveConfig = async () => {
+  addressSaving.liveConfigReset = true
+  try {
+    // 使用配置服务重置直播配置地址
+    const configService = (await import('@/api/services/config')).default
+    const success = await configService.resetLiveConfigUrl()
+    
+    if (success) {
+      // 更新界面显示的地址
+      const newLiveConfigUrl = configService.getLiveConfigUrl()
+      addressSettings.liveConfig = newLiveConfigUrl || ''
+      
+      // 同步保存到本地存储
+      const savedAddresses = JSON.parse(localStorage.getItem('addressSettings') || '{}')
+      savedAddresses.liveConfig = newLiveConfigUrl || ''
+      localStorage.setItem('addressSettings', JSON.stringify(savedAddresses))
+      
+      addressStatus.liveConfig = {
+        type: 'success',
+        message: '直播配置地址已重置为当前点播配置中的默认地址'
+      }
+      Message.success('直播配置地址重置成功')
+    } else {
+      addressStatus.liveConfig = {
+        type: 'error',
+        message: '重置失败：当前点播配置中未找到直播地址'
+      }
+      Message.error('重置失败：当前点播配置中未找到直播地址')
+    }
+  } catch (error) {
+    console.error('重置直播配置地址失败:', error)
+    addressStatus.liveConfig = {
+      type: 'error',
+      message: '重置失败：' + (error.message || '未知错误')
+    }
+    Message.error('重置失败：' + (error.message || '未知错误'))
+  } finally {
+    addressSaving.liveConfigReset = false
+    // 8秒后清除状态消息
+    setTimeout(() => {
+      addressStatus.liveConfig = null
     }, 8000)
   }
 }
