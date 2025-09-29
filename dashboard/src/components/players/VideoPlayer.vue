@@ -3,6 +3,15 @@
     <div class="player-header">
       <h3>正在播放: {{ episodeName }}</h3>
       <div class="player-controls">
+        <a-select 
+          :model-value="playerType" 
+          @change="handlePlayerTypeChange"
+          size="small" 
+          style="width: 120px; margin-right: 8px;"
+        >
+          <a-option value="default">默认播放器</a-option>
+          <a-option value="artplayer">ArtPlayer</a-option>
+        </a-select>
         <a-button @click="closePlayer" size="small" type="outline">
           <template #icon>
             <icon-close />
@@ -49,11 +58,15 @@ const props = defineProps({
   poster: {
     type: String,
     default: ''
+  },
+  playerType: {
+    type: String,
+    default: 'default'
   }
 })
 
 // Emits
-const emit = defineEmits(['close', 'error'])
+const emit = defineEmits(['close', 'error', 'player-change'])
 
 // 响应式数据
 const videoPlayer = ref(null)
@@ -257,6 +270,11 @@ const closePlayer = () => {
   }
   
   emit('close')
+}
+
+// 处理播放器类型变更
+const handlePlayerTypeChange = (newType) => {
+  emit('player-change', newType)
 }
 
 // 监听视频URL变化

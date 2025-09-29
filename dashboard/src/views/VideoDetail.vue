@@ -48,14 +48,28 @@
 
     <!-- 详情内容 -->
     <div v-else-if="videoDetail" class="detail-content">
-      <!-- 视频播放器组件 -->
+      <!-- 默认视频播放器组件 -->
       <VideoPlayer 
-        v-if="showVideoPlayer && currentEpisodeUrl"
+        v-if="showVideoPlayer && currentEpisodeUrl && playerType === 'default'"
         :video-url="currentEpisodeUrl"
         :episode-name="currentEpisodeName"
         :poster="videoDetail?.vod_pic"
         :visible="showVideoPlayer"
+        :player-type="playerType"
         @close="handlePlayerClose"
+        @player-change="handlePlayerTypeChange"
+      />
+
+      <!-- ArtPlayer 播放器组件 -->
+      <ArtVideoPlayer 
+        v-if="showVideoPlayer && currentEpisodeUrl && playerType === 'artplayer'"
+        :video-url="currentEpisodeUrl"
+        :episode-name="currentEpisodeName"
+        :poster="videoDetail?.vod_pic"
+        :visible="showVideoPlayer"
+        :player-type="playerType"
+        @close="handlePlayerClose"
+        @player-change="handlePlayerTypeChange"
       />
 
       <!-- 视频信息卡片 -->
@@ -162,6 +176,7 @@ import { useFavoriteStore } from '@/stores/favoriteStore'
 import { useHistoryStore } from '@/stores/historyStore'
 import { usePageStateStore } from '@/stores/pageStateStore'
 import VideoPlayer from '@/components/players/VideoPlayer.vue'
+import ArtVideoPlayer from '@/components/players/ArtVideoPlayer.vue'
 import EpisodeSelector from '@/components/players/EpisodeSelector.vue'
 import { 
   IconLeft, 
@@ -208,6 +223,7 @@ const currentSiteInfo = ref({
 
 // 视频播放器相关
 const showVideoPlayer = ref(false)
+const playerType = ref('default') // 'default' 或 'artplayer'
 
 // 图片查看器相关
 const viewerImages = ref([])
@@ -663,6 +679,11 @@ const handlePlayerClose = () => {
   showVideoPlayer.value = false
 }
 
+// 处理播放器类型变更
+const handlePlayerTypeChange = (newType) => {
+  playerType.value = newType
+}
+
 const selectEpisode = (index) => {
   currentEpisode.value = index
   
@@ -987,6 +1008,8 @@ onUnmounted(() => {
   margin: 0 auto;
   width: 100%;
 }
+
+
 
 .video-info-card {
   margin-bottom: 24px;
