@@ -3,22 +3,23 @@
  * 封装视频播放、详情、搜索等功能
  */
 
-import { 
-  getHomeData, 
-  getCategoryData, 
-  getVideoDetail, 
-  getPlayData, 
+import {
+  getHomeData,
+  getCategoryData,
+  getVideoDetail,
+  getPlayData,
   searchVideos,
-  refreshModule 
+  refreshModule,
+  executeAction
 } from '../modules/module'
 import { parseVideo } from '../modules/parse'
 import { encodeFilters, validateModule, validateVideoId } from '../utils'
-import { 
-  createVideoInfo, 
-  createSearchParams, 
+import {
+  createVideoInfo,
+  createSearchParams,
   createPaginationInfo,
   VIDEO_TYPES,
-  SORT_TYPES 
+  SORT_TYPES
 } from '../types'
 
 /**
@@ -55,7 +56,7 @@ class VideoService {
         requestOptions.apiUrl = apiUrl
       }
       const response = await getHomeData(module, requestOptions)
-      
+
       // 格式化返回数据
       const result = {
         categories: response.class || [],
@@ -87,7 +88,7 @@ class VideoService {
     }
 
     const { typeId, page = 1, filters = {}, apiUrl, extend } = params
-    
+
     if (!typeId) {
       throw new Error('分类ID不能为空')
     }
@@ -120,7 +121,7 @@ class VideoService {
       }
 
       const response = await getCategoryData(module, requestParams)
-      
+
       // 格式化返回数据
       const result = {
         videos: (response.list || []).map(this.formatVideoInfo),
@@ -156,7 +157,7 @@ class VideoService {
     }
 
     const cacheKey = `detail_${module}_${videoId}`
-    
+
     // 如果不跳过缓存，则检查缓存
     if (!skipCache) {
       const cached = this.getFromCache(cacheKey)
@@ -177,13 +178,13 @@ class VideoService {
         params.extend = extend
       }
       const response = await getVideoDetail(module, params)
-      
+
       if (!response.list || response.list.length === 0) {
         throw new Error('视频不存在')
       }
 
       const videoInfo = this.formatVideoInfo(response.list[0])
-      
+
       // 解析播放地址
       if (videoInfo.vod_play_url) {
         videoInfo.playList = this.parsePlayUrls(videoInfo.vod_play_url, videoInfo.vod_play_from)
@@ -213,7 +214,7 @@ class VideoService {
     }
 
     const { keyword, page = 1, extend, apiUrl } = params
-    
+
     if (!keyword || keyword.trim().length === 0) {
       throw new Error('搜索关键词不能为空')
     }
@@ -223,19 +224,19 @@ class VideoService {
         wd: keyword.trim(),
         pg: page
       }
-      
+
       // 添加extend参数
       if (extend) {
         requestParams.extend = extend
       }
-      
+
       // 添加apiUrl参数
       if (apiUrl) {
         requestParams.apiUrl = apiUrl
       }
-      
+
       const response = await searchVideos(module, requestParams)
-      
+
       // 格式化返回数据
       const result = {
         videos: (response.list || []).map(this.formatVideoInfo),
@@ -278,7 +279,7 @@ class VideoService {
         params.extend = extend
       }
       const response = await getPlayData(module, params)
-      
+
       return {
         url: response.url || playUrl,
         headers: response.headers || {},
@@ -309,7 +310,7 @@ class VideoService {
 
     try {
       const response = await parseVideo(jx, { url, ...options })
-      
+
       return {
         url: response.url || url,
         type: response.type || 'mp4',
@@ -318,6 +319,44 @@ class VideoService {
       }
     } catch (error) {
       console.error('解析视频地址失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 执行T4 Action动作
+   * @param {string} module - 模块名称
+   * @param {string} actionName - 动作名称
+   * @param {object} options - 选项参数
+   * @param {string} options.apiUrl - API地址
+   * @param {string} options.extend - 扩展参数
+   * @returns {Promise} Action执行结果
+   */
+  async executeT4Action(module, actionName, options = {}) {
+    if (!validateModule(module)) {
+      throw new Error('无效的模块名称')
+    }
+
+    if (!actionName || actionName.trim().length === 0) {
+      throw new Error('动作名称不能为空')
+    }
+
+    try {
+      const actionData = {
+        action: actionName.trim(),
+        value: options.value || '',
+        extend: options.extend,
+        apiUrl: options.apiUrl
+      }
+
+      console.log('执行T4 action:', { module, actionData })
+
+      const result = await executeAction(module, actionData)
+      console.log('T4 action执行结果:', result)
+
+      return result
+    } catch (error) {
+      console.error('T4 action执行失败:', error)
       throw error
     }
   }
@@ -337,9 +376,9 @@ class VideoService {
     try {
       // 清除相关缓存
       this.clearModuleCache(module)
-      
+
       const response = await refreshModule(module, extend, apiUrl)
-      
+
       return {
         success: true,
         message: response.msg || '刷新成功',
@@ -358,7 +397,7 @@ class VideoService {
    */
   formatVideoInfo(rawVideo) {
     const video = createVideoInfo()
-    
+
     Object.keys(video).forEach(key => {
       if (rawVideo[key] !== undefined) {
         video[key] = rawVideo[key]
@@ -422,18 +461,18 @@ class VideoService {
    */
   createPagination(response, currentPage = 1) {
     const pagination = createPaginationInfo()
-    
+
     pagination.page = currentPage
-    
+
     // 处理不同的API响应格式
     const total = response.total || response.recordcount || 0
     const pageCount = response.pagecount || response.totalPages || 0
     const pageSize = response.limit || response.pagesize || 20
     const currentList = response.list || []
-    
+
     pagination.total = total
     pagination.pageSize = pageSize
-    
+
     // 如果API返回了总页数，直接使用
     if (pageCount > 0) {
       pagination.totalPages = pageCount
@@ -445,12 +484,12 @@ class VideoService {
     } else {
       // 如果没有总数信息，根据当前返回的数据判断
       // 检查是否有"no_data"标识
-      const hasNoDataFlag = currentList.some(item => 
-        item.vod_id === 'no_data' || 
+      const hasNoDataFlag = currentList.some(item =>
+        item.vod_id === 'no_data' ||
         item.vod_name === 'no_data' ||
         (typeof item === 'string' && item.includes('no_data'))
       )
-      
+
       if (hasNoDataFlag || currentList.length === 0) {
         // 如果有no_data标识或列表为空，表示没有更多数据
         pagination.hasNext = false
@@ -461,7 +500,7 @@ class VideoService {
         pagination.totalPages = currentPage + 1
       }
     }
-    
+
     pagination.hasPrev = currentPage > 1
 
     return pagination

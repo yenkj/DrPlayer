@@ -417,12 +417,13 @@ const loadVideoDetail = async () => {
   const fromCollection = route.query.fromCollection === 'true'
   const fromHistory = route.query.fromHistory === 'true'
   const fromPush = route.query.fromPush === 'true'
+  const fromSpecialAction = route.query.fromSpecialAction === 'true'
   
   try {
     // 确定使用的站源信息
     let module, apiUrl, siteName, extend
     
-    if ((fromCollection || fromHistory || fromPush) && route.query.tempSiteKey) {
+    if ((fromCollection || fromHistory || fromPush||fromSpecialAction) && route.query.tempSiteKey) {
       // 从收藏、历史或推送进入，使用临时站源信息，不影响全局状态
       module = route.query.tempSiteKey
       apiUrl = route.query.tempSiteApi
