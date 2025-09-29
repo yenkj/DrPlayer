@@ -92,6 +92,7 @@
           <div class="preset-buttons">
             <a-button @click="loadPresetData('push_video')" type="outline" status="success" shape="round">推送视频播放</a-button>
             <a-button @click="loadPresetData('push_novel')" type="outline" status="success" shape="round">推送番茄小说</a-button>
+            <a-button @click="loadPresetData('t4_api_test')" type="outline" status="warning" shape="round">T4接口测试</a-button>
           </div>
         </div>
 
@@ -129,11 +130,21 @@
       </div>
     </div>
 
+    <!-- Toast提示 -->
+    <Transition name="action-toast">
+      <div v-if="toast" class="action-toast" :class="toastType">
+        {{ toast }}
+      </div>
+    </Transition>
+
     <!-- ActionRenderer组件 -->
     <ActionRenderer
       v-if="showActionRenderer"
       ref="actionRendererRef"
       :action-data="currentActionData"
+      :module="testModule"
+      :api-url="testApiUrl"
+      :extend="testExtend"
       @close="handleActionClose"
       @submit="handleActionSubmit"
       @error="handleActionError"
@@ -166,13 +177,24 @@ const currentActionData = ref(null)
 const actionRendererRef = ref(null)
 const rendererError = ref(null)
 
+// Toast相关
+const toast = ref('')
+const toastType = ref('success')
+const toastTimer = ref(null)
+
+// T4接口测试参数
+const testModule = ref('test_module')  // 测试模块名
+const testApiUrl = ref('http://localhost:5173/mock/t4-api-test.json')  // 测试API地址（使用模拟数据）
+const testExtend = ref({ test: true })  // 测试扩展参数
+
 // 图片URL（从public目录，支持子目录部署）
 const livesImage = import.meta.env.BASE_URL + 'lives.jpg'
 
 // 预设测试数据
 const presetData = {
   push_video: `{"actionId":"推送视频播放","id":"push","type":"input","title":"推送视频地址进行播放","tip":"支持网盘、官链、直链、待嗅探链接","value":"","msg":"请输入待推送的视频地址","imageUrl":"http://127.0.0.1:5757/public/images/lives.jpg","imageHeight":200,"imageType":"card_pic_3","keep":true,"button":4,"width":640,"selectData":"123:=\`https://www.123684.com/s/oec7Vv-DggWh?ZY4K,腾讯:=https://v.qq.com/x/cover/mzc00200vkqr54u/u4100l66fas.html,爱奇艺:=http://www.iqiyi.com/v_1b0tk1b8tl8.html,夸克:=https://pan.quark.cn/s/6c8158e258f3,UC:=https://drive.uc.cn/s/59023f57d3ce4?public=1,阿里:=https://www.alipan.com/s/vgXMcowK8pQ,天翼:=https://cloud.189.cn/web/share?code=INJbU3NbqyUj,百度:=https://pan.baidu.com/s/1L0UIv4p0X0QrbbKErJuc_w?pwd=2pwj,移动1:=https://yun.139.com/shareweb/#/w/i/0i5CLQ7BpV7Ai,移动2:=https://caiyun.139.com/m/i?2jexC1gcjeN7q,移动3:=https://yun.139.com/shareweb/#/w/i/2i2MoE9ZHn9p1,直链1:=https://vdse.bdstatic.com//628ca08719cef5987ea2ae3c6f0d2386.mp4,嗅探1:=https://www.6080kk.cc/haokanplay/178120-1-1.html,嗅探2:=https://www.hahads.com/play/537106-3-1.html,多集:=https://v.qq.com/x/cover/m441e3rjq9kwpsc/m00253deqqo.html@https://pan.quark.cn/s/6c8158e258f3@https://pan.baidu.com/s/1TdbgcwaMG1dK7B5pQ1LbBg?pwd=1234,海阔二级单线路:=H4sIAAAAAAAAA52Uy27TQBSGXwUZlsT2GefadZ+AN3ATk7qKL7guUoKQXAQFeoEG6oKaVBUFlBZFbdQ0TXAIeRjPTJwVr8AYCsNyijQbnzPfPz72p3kk6WXf8aQFibzszFsb0l2p7Ni+YfusFAe78/W383C6eC8OmnEQsEVal7NxiEebeLQ/i75oKvl6iccfZwdPWY0OhnR8+uPbdnJ2kUx7ONrAo094skMOD+ZHHbL1nIbHbCf53KdBh7RPaP+Yfm8n5x+S3gWr016TtCb03VUa2Brh6A0Nm8ngVRysk7Nt+mI3aYfk9fs0YfMERxENn+FoKw6e3KJ7V8lgyF6+YnrG9UAPTLu6ZNgrpu4ZNlJRlrXve47FWrNomgzPEdJYydYtIx1/Z0rbXTzps9zrza5ZZo1l33dXFxSFPWlyvdGom5ZeNVblsmMpa27N0SvKQ6eipEwGIINAgYKGIA+lYg7kFbfKkta8Wnpqt6sC+8Z3/kQuyXm1qDZ+RbEMt6bXFVBBQ6UMy5KXfat2O4WQMIQ4pAlDGoeywlCWQzlhKMehvDCU51BBGCpwqCgMFTlUEoZKfyFQxX+uyqkbKMGdAHEnAP0Xxa0AcZWAawHiLgH3AsRlAi4GiNsE3AwQ1wm4GiDuE/zjhrhQiLuBxI1C3A0kbhTibqAb3DK/3ZAe/wSSQMKkPgYAAA==\`"}`,
-  push_novel: `{"actionId":"推送番茄小说","id":"push","type":"input","title":"推送番茄小说网页目录链接进行解析","tip":"支持番茄小说网页版链接","value":"\`https://fanqienovel.com/page/7421167583522458648\`","msg":"请输入待推送的番茄小说网页版链接","imageUrl":"http://127.0.0.1:5757/public/images/icon_cookie/%E9%98%85%E8%AF%BB.png","imageHeight":200,"imageType":"card_pic_3","keep":false,"selectData":"大一实习:=\`https://fanqienovel.com/page/7421167583522458648,十日终焉:=https://fanqienovel.com/page/7143038691944959011,斩神:=https://fanqienovel.com/page/6982529841564224526\`"}`
+  push_novel: `{"actionId":"推送番茄小说","id":"push","type":"input","title":"推送番茄小说网页目录链接进行解析","tip":"支持番茄小说网页版链接","value":"\`https://fanqienovel.com/page/7421167583522458648\`","msg":"请输入待推送的番茄小说网页版链接","imageUrl":"http://127.0.0.1:5757/public/images/icon_cookie/%E9%98%85%E8%AF%BB.png","imageHeight":200,"imageType":"card_pic_3","keep":false,"selectData":"大一实习:=\`https://fanqienovel.com/page/7421167583522458648,十日终焉:=https://fanqienovel.com/page/7143038691944959011,斩神:=https://fanqienovel.com/page/6982529841564224526\`"}`,
+  t4_api_test: `{"actionId":"like","id":"t4_test","type":"input","title":"T4接口测试","tip":"测试T4接口调用（ac=action&action=like&value=xxx）","value":"1","msg":"请输入点赞值（1表示点赞，0表示取消点赞）","button":2}`
 }
 
 // 集成测试数据 - 包含action类型的视频
@@ -184,6 +206,14 @@ const testVideosWithAction = ref([
     vod_pic: livesImage,
     vod_remarks: '正常视频',
     vod_tag: 'normal'
+  },
+  // Action视频 - 普通文本Toast测试
+  {
+    vod_id: '这是一个普通文本的Toast提示测试',
+    vod_name: 'Action: Toast文本测试',
+    vod_pic: livesImage,
+    vod_remarks: 'Toast',
+    vod_tag: 'action'
   },
   // Action视频 - 单项输入
   {
@@ -263,6 +293,21 @@ const parseData = () => {
   try {
     console.log('原始数据:', rawData.value)
     
+    // 检查是否是普通字符串（非JSON格式）
+    const trimmedData = rawData.value.trim()
+    
+    // 如果不是以 { 开头，可能是普通的vod_id字符串
+    if (!trimmedData.startsWith('{')) {
+      // 显示toast提示，模拟action响应
+      showToast(`Action响应: ${trimmedData}`, 'info')
+      
+      parseResult.value = {
+        success: false,
+        error: '检测到普通字符串，已作为Action响应显示Toast提示'
+      }
+      return
+    }
+    
     // 使用ActionRenderer相同的解析逻辑
     const config = parseActionConfig(rawData.value)
     console.log('解析后的配置:', config)
@@ -276,11 +321,37 @@ const parseData = () => {
     }
   } catch (error) {
     console.error('解析错误:', error)
-    parseResult.value = {
-      success: false,
-      error: error.message || error.toString()
+    
+    // 如果JSON解析失败，也尝试作为普通字符串处理
+    const trimmedData = rawData.value.trim()
+    if (trimmedData && !trimmedData.startsWith('{')) {
+      showToast(`Action响应: ${trimmedData}`, 'info')
+      parseResult.value = {
+        success: false,
+        error: '检测到普通字符串，已作为Action响应显示Toast提示'
+      }
+    } else {
+      parseResult.value = {
+        success: false,
+        error: error.message || error.toString()
+      }
     }
   }
+}
+
+// 显示Toast
+const showToast = (message, type = 'success') => {
+  if (toastTimer.value) {
+    clearTimeout(toastTimer.value)
+  }
+  
+  toast.value = message
+  toastType.value = type
+  
+  toastTimer.value = setTimeout(() => {
+    toast.value = ''
+    toastTimer.value = null
+  }, 3000)
 }
 
 // 测试ActionRenderer
@@ -572,6 +643,54 @@ const handleActionError = (error) => {
   color: var(--color-text-3);
   margin-bottom: 15px;
   font-size: 14px;
+}
+
+/* Toast样式 */
+.action-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 12px 24px;
+  border-radius: 6px;
+  color: white;
+  font-weight: 500;
+  z-index: 9999;
+  max-width: 80%;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.action-toast.success {
+  background-color: #52c41a;
+}
+
+.action-toast.error {
+  background-color: #f5222d;
+}
+
+.action-toast.warning {
+  background-color: #faad14;
+}
+
+.action-toast.info {
+  background-color: #1890ff;
+}
+
+/* Toast动画 */
+.action-toast-enter-active,
+.action-toast-leave-active {
+  transition: all 0.3s ease;
+}
+
+.action-toast-enter-from {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+.action-toast-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
 }
 
 .integration-test-subsection:first-child {
