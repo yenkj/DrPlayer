@@ -56,8 +56,11 @@
         :poster="videoDetail?.vod_pic"
         :visible="showVideoPlayer"
         :player-type="playerType"
+        :episodes="currentRouteEpisodes"
+        :current-episode-index="currentEpisodeIndex"
         @close="handlePlayerClose"
         @player-change="handlePlayerTypeChange"
+        @next-episode="handleNextEpisode"
       />
 
       <!-- ArtPlayer 播放器组件 -->

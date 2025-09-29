@@ -58,6 +58,25 @@
       >
         您的浏览器不支持视频播放
       </video>
+      
+      <!-- 自动下一集倒计时弹窗 -->
+      <div v-if="showAutoNextDialog" class="auto-next-dialog">
+        <div class="auto-next-content">
+          <div class="auto-next-title">
+            <span>即将播放下一集</span>
+          </div>
+          <div class="auto-next-episode" v-if="getNextEpisode()">
+            {{ getNextEpisode().name }}
+          </div>
+          <div class="auto-next-countdown">
+            {{ autoNextCountdown }} 秒后自动播放
+          </div>
+          <div class="auto-next-buttons">
+            <button @click="playNextEpisode" class="btn-play-now">立即播放</button>
+            <button @click="cancelAutoNext" class="btn-cancel">取消</button>
+          </div>
+        </div>
+      </div>
     </div>
   </a-card>
 </template>
@@ -89,17 +108,30 @@ const props = defineProps({
   playerType: {
     type: String,
     default: 'default'
+  },
+  // 自动下一集功能相关 props
+  episodes: {
+    type: Array,
+    default: () => []
+  },
+  currentEpisodeIndex: {
+    type: Number,
+    default: 0
   }
 })
 
 // Emits
-const emit = defineEmits(['close', 'error', 'player-change'])
+const emit = defineEmits(['close', 'error', 'player-change', 'next-episode'])
 
 // 响应式数据
 const videoPlayer = ref(null)
 const hlsInstance = ref(null)
-const autoNext = ref(false)
+const autoNext = ref(true) // 默认开启自动连播
 const showCountdown = ref(false)
+const showAutoNextDialog = ref(false)
+const autoNextCountdown = ref(10)
+const countdownTimer = ref(null)
+const isProcessingAutoNext = ref(false) // 防止重复触发自动连播
 
 // 切换自动连播
 const toggleAutoNext = () => {
@@ -109,6 +141,64 @@ const toggleAutoNext = () => {
 // 切换倒计时显示
 const toggleCountdown = () => {
   showCountdown.value = !showCountdown.value
+}
+
+// 检查是否有下一集
+const hasNextEpisode = () => {
+  return props.episodes && props.episodes.length > 0 && 
+         props.currentEpisodeIndex < props.episodes.length - 1
+}
+
+// 获取下一集信息
+const getNextEpisode = () => {
+  if (hasNextEpisode()) {
+    return props.episodes[props.currentEpisodeIndex + 1]
+  }
+  return null
+}
+
+// 播放下一集
+const playNextEpisode = () => {
+  if (hasNextEpisode()) {
+    const nextIndex = props.currentEpisodeIndex + 1
+    emit('next-episode', nextIndex)
+    hideAutoNextDialog()
+    // 重置防抖标志
+    setTimeout(() => {
+      isProcessingAutoNext.value = false
+    }, 2000) // 2秒后重置，给视频切换足够的时间
+  }
+}
+
+// 显示自动下一集对话框
+const showAutoNextDialogFunc = () => {
+  if (!autoNext.value || !hasNextEpisode()) return
+  
+  showAutoNextDialog.value = true
+  autoNextCountdown.value = 10
+  
+  countdownTimer.value = setInterval(() => {
+    autoNextCountdown.value--
+    if (autoNextCountdown.value <= 0) {
+      playNextEpisode()
+    }
+  }, 1000)
+}
+
+// 隐藏自动下一集对话框
+const hideAutoNextDialog = () => {
+  showAutoNextDialog.value = false
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+    countdownTimer.value = null
+  }
+}
+
+// 取消自动下一集
+const cancelAutoNext = () => {
+  hideAutoNextDialog()
+  // 重置防抖标志
+  isProcessingAutoNext.value = false
 }
 
 // 链接类型判断函数
@@ -179,6 +269,30 @@ const initVideoPlayer = (url) => {
   
   const video = videoPlayer.value
   
+  // 视频结束事件处理函数
+  const handleVideoEnded = () => {
+    console.log('视频播放结束')
+    
+    // 防抖：如果正在处理自动连播，则忽略
+    if (isProcessingAutoNext.value) {
+      console.log('正在处理自动连播，忽略重复的ended事件')
+      return
+    }
+    
+    if (autoNext.value && hasNextEpisode()) {
+      isProcessingAutoNext.value = true
+      
+      if (showCountdown.value) {
+        showAutoNextDialogFunc()
+      } else {
+        // 如果不显示倒计时，直接播放下一集
+        setTimeout(() => {
+          playNextEpisode()
+        }, 1000)
+      }
+    }
+  }
+
   // 检测视频格式
   const isM3u8 = url.toLowerCase().includes('.m3u8') || url.toLowerCase().includes('m3u8')
   
@@ -243,6 +357,7 @@ const initVideoPlayer = (url) => {
     } else {
       Message.error('您的浏览器不支持HLS播放')
       emit('error', '浏览器不支持HLS播放')
+      return // 如果不支持HLS，直接返回，不添加事件监听器
     }
   } else {
     // 处理其他格式的视频（mp4, webm, avi等）
@@ -290,6 +405,10 @@ const initVideoPlayer = (url) => {
     // 开始加载视频
     video.load()
   }
+  
+  // 统一添加视频结束事件监听器（避免重复添加）
+  video.removeEventListener('ended', handleVideoEnded)
+  video.addEventListener('ended', handleVideoEnded)
 }
 
 // 关闭播放器
@@ -343,9 +462,23 @@ watch(() => props.visible, (newVisible) => {
 // 组件卸载时清理资源
 onUnmounted(() => {
   console.log('VideoPlayer组件卸载，清理播放器资源')
+  
+  // 清理视频播放器
+  if (videoPlayer.value) {
+    videoPlayer.value.pause()
+    videoPlayer.value.src = ''
+    videoPlayer.value.load() // 这会清理所有事件监听器
+  }
+  
   if (hlsInstance.value) {
     hlsInstance.value.destroy()
     hlsInstance.value = null
+  }
+  
+  // 清理倒计时定时器
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+    countdownTimer.value = null
   }
 })
 </script>
@@ -484,6 +617,82 @@ onUnmounted(() => {
 .video-player::-webkit-media-controls-current-time-display,
 .video-player::-webkit-media-controls-time-remaining-display {
   color: #fff;
+}
+
+/* 自动下一集倒计时弹窗样式 */
+.auto-next-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 12px;
+  padding: 24px;
+  z-index: 1000;
+  min-width: 300px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.auto-next-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auto-next-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.auto-next-episode {
+  font-size: 14px;
+  color: #23ade5;
+  font-weight: 500;
+}
+
+.auto-next-countdown {
+  font-size: 18px;
+  font-weight: bold;
+  color: #ff6b6b;
+}
+
+.auto-next-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.btn-play-now,
+.btn-cancel {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-play-now {
+  background: #23ade5;
+  color: white;
+}
+
+.btn-play-now:hover {
+  background: #1890d5;
+}
+
+.btn-cancel {
+  background: #666;
+  color: white;
+}
+
+.btn-cancel:hover {
+  background: #555;
 }
 
 /* 响应式设计 */
