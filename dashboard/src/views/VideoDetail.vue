@@ -48,8 +48,35 @@
 
     <!-- 详情内容 -->
     <div v-else-if="videoDetail" class="detail-content">
+      <!-- 视频播放器 -->
+      <a-card v-if="showVideoPlayer && currentEpisodeUrl" class="video-player-section">
+        <div class="player-header">
+          <h3>正在播放: {{ currentEpisodeName }}</h3>
+          <div class="player-controls">
+            <a-button @click="closeVideoPlayer" size="small" type="outline">
+              <template #icon>
+                <icon-close />
+              </template>
+              关闭播放器
+            </a-button>
+          </div>
+        </div>
+        <div class="video-player-container">
+          <video 
+            ref="videoPlayer"
+            class="video-player"
+            controls
+            autoplay
+            preload="auto"
+            :poster="videoDetail?.vod_pic"
+          >
+            您的浏览器不支持视频播放
+          </video>
+        </div>
+      </a-card>
+
       <!-- 视频信息卡片 -->
-      <a-card class="video-info-card">
+      <a-card class="video-info-card" :class="{ 'collapsed-when-playing': showVideoPlayer }">
         <div class="video-header">
           <div class="video-poster" @click="showImageModal">
             <img :src="videoDetail.vod_pic" :alt="videoDetail.vod_name" @error="handleImageError" />
@@ -115,6 +142,8 @@
           </a-button>
         </div>
       </a-card>
+
+
 
       <!-- 播放线路和选集 -->
       <a-card v-if="playRoutes.length > 0" class="play-section">
@@ -232,9 +261,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Message } from '@arco-design/web-vue'
+import Hls from 'hls.js'
 import videoService from '@/api/services/video'
 import { useSiteStore } from '@/stores/siteStore'
 import { useFavoriteStore } from '@/stores/favoriteStore'
@@ -250,7 +280,8 @@ import {
   IconSortDescending,
   IconSettings,
   IconMenu,
-  IconEye
+  IconEye,
+  IconClose
 } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
@@ -290,6 +321,11 @@ const currentSiteInfo = ref({
   api: '',
   key: ''
 })
+
+// 视频播放器相关
+const showVideoPlayer = ref(false)
+const videoPlayer = ref(null)
+const hlsInstance = ref(null)
 
 // 图片查看器相关
 const viewerImages = ref([])
@@ -402,6 +438,12 @@ const actualLayoutColumns = computed(() => {
     return smartLayoutColumns.value
   }
   return parseInt(episodeLayoutColumns.value) || 12
+})
+
+// 当前选集名称
+const currentEpisodeName = computed(() => {
+  const episode = currentRouteEpisodes.value[currentEpisode.value]
+  return episode?.displayName || episode?.name || '未知选集'
 })
 
 // 方法
@@ -771,6 +813,25 @@ const switchRoute = (index) => {
 const selectEpisode = (index) => {
   currentEpisode.value = index
   
+  // 获取当前选集的URL
+  const episodeUrl = currentRouteEpisodes.value[index]?.url
+  
+  // 启动内置播放器播放所有格式的视频
+  if (episodeUrl) {
+    console.log('启动内置播放器播放视频:', episodeUrl)
+    showVideoPlayer.value = true
+    
+    // 等待DOM更新后初始化播放器
+    nextTick(() => {
+      initVideoPlayer(episodeUrl)
+    })
+    
+    Message.success(`开始播放: ${currentEpisodeName.value}`)
+  } else {
+    console.log('选集URL为空，无法播放')
+    Message.error('选集URL为空，无法播放')
+  }
+  
   // 添加到历史记录
   if (videoDetail.value && currentRouteEpisodes.value[index]) {
     const videoInfo = {
@@ -913,7 +974,12 @@ const playVideo = () => {
               if (currentEpisodeUrl.value) {
                 console.log('播放历史记录位置:', historyItem.current_episode_name)
                 Message.info(`继续播放: ${historyItem.current_episode_name}`)
-                window.open(currentEpisodeUrl.value, '_blank')
+                
+                // 启动内置播放器
+                showVideoPlayer.value = true
+                nextTick(() => {
+                  initVideoPlayer(currentEpisodeUrl.value)
+                })
                 
                 // 更新历史记录的播放时间
                 updateHistoryRecord()
@@ -950,7 +1016,12 @@ const playFirstEpisode = () => {
           if (currentEpisodeUrl.value) {
             console.log('播放第一个选集:', currentRouteEpisodes.value[0].name)
             Message.info(`开始播放: ${currentRouteEpisodes.value[0].name}`)
-            window.open(currentEpisodeUrl.value, '_blank')
+            
+            // 启动内置播放器
+            showVideoPlayer.value = true
+            nextTick(() => {
+              initVideoPlayer(currentEpisodeUrl.value)
+            })
             
             // 添加到历史记录
             updateHistoryRecord()
@@ -1029,9 +1100,213 @@ watch(() => siteStore.nowSite, (newSite, oldSite) => {
   }
 }, { deep: true })
 
+// 链接类型判断函数
+const isDirectVideoLink = (url) => {
+  if (!url) return false
+  
+  // 视频文件扩展名
+  const videoExtensions = [
+    '.mp4', '.webm', '.ogg', '.avi', '.mov', '.wmv', '.flv', '.mkv', 
+    '.m4v', '.3gp', '.ts', '.m3u8', '.mpd'
+  ]
+  
+  // 检查URL是否包含视频扩展名
+  const hasVideoExtension = videoExtensions.some(ext => 
+    url.toLowerCase().includes(ext)
+  )
+  
+  // 检查是否是流媒体格式
+  const isStreamingFormat = url.toLowerCase().includes('m3u8') || 
+                           url.toLowerCase().includes('mpd') ||
+                           url.toLowerCase().includes('rtmp') ||
+                           url.toLowerCase().includes('rtsp')
+  
+  // 检查是否看起来像网页链接
+  const looksLikeWebpage = url.includes('://') && 
+                          (url.includes('.html') || 
+                           url.includes('.php') || 
+                           url.includes('.asp') || 
+                           url.includes('.jsp') ||
+                           url.match(/\/[^.]*$/) || // 没有扩展名的路径
+                           url.includes('?') || // 包含查询参数
+                           url.includes('#')) // 包含锚点
+  
+  // 如果有视频扩展名或是流媒体格式，认为是直链
+  if (hasVideoExtension || isStreamingFormat) {
+    return true
+  }
+  
+  // 如果看起来像网页，认为不是直链
+  if (looksLikeWebpage && !hasVideoExtension && !isStreamingFormat) {
+    return false
+  }
+  
+  // 默认尝试作为直链处理
+  return true
+}
+
+// 视频播放器相关方法
+const initVideoPlayer = (url) => {
+  if (!videoPlayer.value || !url) return
+  
+  console.log('初始化视频播放器:', url)
+  
+  // 首先判断链接类型
+  if (!isDirectVideoLink(url)) {
+    console.log('检测到网页链接，在新窗口打开:', url)
+    Message.info('检测到网页链接，正在新窗口打开...')
+    window.open(url, '_blank')
+    showVideoPlayer.value = false // 关闭播放器
+    return
+  }
+  
+  // 清理之前的HLS实例
+  if (hlsInstance.value) {
+    hlsInstance.value.destroy()
+    hlsInstance.value = null
+  }
+  
+  const video = videoPlayer.value
+  
+  // 检测视频格式
+  const isM3u8 = url.toLowerCase().includes('.m3u8') || url.toLowerCase().includes('m3u8')
+  
+  if (isM3u8) {
+    // 处理m3u8格式
+    if (Hls.isSupported()) {
+      // 使用HLS.js播放m3u8
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+        backBufferLength: 90
+      })
+      
+      hls.loadSource(url)
+      hls.attachMedia(video)
+      
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('HLS manifest 解析完成，开始播放')
+        video.play().catch(err => {
+          console.warn('自动播放失败:', err)
+        })
+      })
+      
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.error('HLS播放错误:', data)
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              Message.error('网络错误，请检查网络连接')
+              hls.startLoad()
+              break
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              Message.error('媒体错误，尝试恢复播放')
+              hls.recoverMediaError()
+              break
+            default:
+              // 播放器错误时，检查是否为网页链接
+              if (!isDirectVideoLink(url)) {
+                console.log('HLS播放失败，检测到可能是网页链接，在新窗口打开:', url)
+                Message.info('视频播放失败，检测到网页链接，正在新窗口打开...')
+                window.open(url, '_blank')
+                showVideoPlayer.value = false // 关闭播放器
+              } else {
+                Message.error('播放器错误，请重试')
+              }
+              hls.destroy()
+              break
+          }
+        }
+      })
+      
+      hlsInstance.value = hls
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari原生支持HLS
+      video.src = url
+      video.addEventListener('loadedmetadata', () => {
+        video.play().catch(err => {
+          console.warn('自动播放失败:', err)
+        })
+      })
+    } else {
+      Message.error('您的浏览器不支持HLS播放')
+    }
+  } else {
+    // 处理其他格式的视频（mp4, webm, avi等）
+    console.log('播放普通视频格式:', url)
+    video.src = url
+    
+    // 添加事件监听器
+    const handleLoadedMetadata = () => {
+      console.log('视频元数据加载完成，开始播放')
+      video.play().catch(err => {
+        console.warn('自动播放失败:', err)
+        Message.warning('自动播放失败，请手动点击播放')
+      })
+    }
+    
+    const handleError = (e) => {
+      console.error('视频播放错误:', e)
+      
+      // 如果播放失败，再次检查是否为网页链接
+      if (!isDirectVideoLink(url)) {
+        console.log('播放失败，检测到可能是网页链接，在新窗口打开:', url)
+        Message.info('视频播放失败，检测到网页链接，正在新窗口打开...')
+        window.open(url, '_blank')
+        showVideoPlayer.value = false // 关闭播放器
+      } else {
+        Message.error('视频播放失败，请检查视频链接或格式')
+      }
+    }
+    
+    const handleLoadStart = () => {
+      console.log('开始加载视频')
+    }
+    
+    // 移除之前的事件监听器（如果有）
+    video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+    video.removeEventListener('error', handleError)
+    video.removeEventListener('loadstart', handleLoadStart)
+    
+    // 添加新的事件监听器
+    video.addEventListener('loadedmetadata', handleLoadedMetadata)
+    video.addEventListener('error', handleError)
+    video.addEventListener('loadstart', handleLoadStart)
+    
+    // 开始加载视频
+    video.load()
+  }
+}
+
+const closeVideoPlayer = () => {
+  console.log('关闭视频播放器')
+  showVideoPlayer.value = false
+  
+  // 停止播放
+  if (videoPlayer.value) {
+    videoPlayer.value.pause()
+    videoPlayer.value.currentTime = 0
+  }
+  
+  // 清理HLS实例
+  if (hlsInstance.value) {
+    hlsInstance.value.destroy()
+    hlsInstance.value = null
+  }
+}
+
 // 组件挂载时的初始化（watch已经设置了immediate: true，无需重复调用）
 onMounted(() => {
   console.log('VideoDetail组件已挂载')
+})
+
+// 组件卸载时清理资源
+onUnmounted(() => {
+  console.log('VideoDetail组件卸载，清理播放器资源')
+  if (hlsInstance.value) {
+    hlsInstance.value.destroy()
+    hlsInstance.value = null
+  }
 })
 </script>
 
@@ -1142,6 +1417,69 @@ onMounted(() => {
 
 .video-info-card {
   margin-bottom: 24px;
+  transition: all 0.3s ease;
+}
+
+/* 当播放器显示时折叠视频信息卡片 */
+.video-info-card.collapsed-when-playing {
+  margin-bottom: 16px;
+}
+
+.video-info-card.collapsed-when-playing .video-header {
+  margin-bottom: 12px;
+}
+
+.video-info-card.collapsed-when-playing .video-poster {
+  width: 120px;
+  height: 168px;
+}
+
+.video-info-card.collapsed-when-playing .video-info {
+  gap: 8px;
+}
+
+.video-info-card.collapsed-when-playing .title-main {
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.video-info-card.collapsed-when-playing .video-meta {
+  gap: 8px;
+}
+
+.video-info-card.collapsed-when-playing .meta-item {
+  font-size: 12px;
+  padding: 2px 6px;
+}
+
+.video-info-card.collapsed-when-playing .video-description {
+  margin-top: 12px;
+}
+
+.video-info-card.collapsed-when-playing .video-description h3 {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.video-info-card.collapsed-when-playing .description-content {
+  font-size: 13px;
+  line-height: 1.4;
+  max-height: 60px;
+  overflow: hidden;
+}
+
+.video-info-card.collapsed-when-playing .description-content.expanded {
+  max-height: none;
+}
+
+.video-info-card.collapsed-when-playing .play-actions {
+  gap: 8px;
+}
+
+.video-info-card.collapsed-when-playing .play-btn,
+.video-info-card.collapsed-when-playing .copy-btn {
+  height: 32px;
+  font-size: 13px;
 }
 
 .video-header {
@@ -1158,12 +1496,44 @@ onMounted(() => {
   overflow: hidden;
   background: var(--color-bg-3);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
+  cursor: pointer;
 }
 
 .video-poster img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.poster-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.video-poster:hover .poster-overlay {
+  opacity: 1;
+}
+
+.poster-overlay .view-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.poster-overlay span {
+  font-size: 14px;
 }
 
 .video-meta {
@@ -1427,6 +1797,62 @@ onMounted(() => {
   padding: 40px;
 }
 
+/* 视频播放器样式 */
+.video-player-section {
+  margin-bottom: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.player-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.player-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  margin: 0;
+}
+
+.player-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.video-player-container {
+  position: relative;
+  width: 100%;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.video-player {
+  width: 100%;
+  height: auto;
+  min-height: 400px;
+  max-height: 70vh;
+  background: #000;
+  outline: none;
+}
+
+.video-player::-webkit-media-controls-panel {
+  background-color: transparent;
+}
+
+.video-player::-webkit-media-controls-play-button,
+.video-player::-webkit-media-controls-volume-slider,
+.video-player::-webkit-media-controls-timeline,
+.video-player::-webkit-media-controls-current-time-display,
+.video-player::-webkit-media-controls-time-remaining-display {
+  color: #fff;
+}
+
 /* 响应式设计 */
 @media (max-width: 1200px) {
   .detail-content {
@@ -1512,6 +1938,35 @@ onMounted(() => {
     width: 100%;
     height: 40px;
   }
+
+  /* 播放器响应式 */
+  .video-player-section {
+    margin-bottom: 16px;
+  }
+
+  .player-header h3 {
+    font-size: 16px;
+  }
+
+  .video-player {
+    min-height: 250px;
+  }
+
+  /* 折叠状态响应式 */
+  .video-info-card.collapsed-when-playing .video-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .video-info-card.collapsed-when-playing .video-poster {
+    width: 100px;
+    height: 140px;
+    align-self: center;
+  }
+
+  .video-info-card.collapsed-when-playing .title-main {
+    font-size: 16px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1534,6 +1989,35 @@ onMounted(() => {
   
   .episodes-grid {
     grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  }
+
+  /* 小屏幕播放器适配 */
+  .video-player-section {
+    margin-bottom: 12px;
+  }
+
+  .player-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .player-header h3 {
+    font-size: 14px;
+  }
+
+  .video-player {
+    min-height: 200px;
+  }
+
+  /* 小屏幕折叠状态 */
+  .video-info-card.collapsed-when-playing .video-poster {
+    width: 80px;
+    height: 112px;
+  }
+
+  .video-info-card.collapsed-when-playing .title-main {
+    font-size: 14px;
   }
 }
 </style>
