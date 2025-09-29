@@ -48,32 +48,15 @@
 
     <!-- 详情内容 -->
     <div v-else-if="videoDetail" class="detail-content">
-      <!-- 视频播放器 -->
-      <a-card v-if="showVideoPlayer && currentEpisodeUrl" class="video-player-section">
-        <div class="player-header">
-          <h3>正在播放: {{ currentEpisodeName }}</h3>
-          <div class="player-controls">
-            <a-button @click="closeVideoPlayer" size="small" type="outline">
-              <template #icon>
-                <icon-close />
-              </template>
-              关闭播放器
-            </a-button>
-          </div>
-        </div>
-        <div class="video-player-container">
-          <video 
-            ref="videoPlayer"
-            class="video-player"
-            controls
-            autoplay
-            preload="auto"
-            :poster="videoDetail?.vod_pic"
-          >
-            您的浏览器不支持视频播放
-          </video>
-        </div>
-      </a-card>
+      <!-- 视频播放器组件 -->
+      <VideoPlayer 
+        v-if="showVideoPlayer && currentEpisodeUrl"
+        :video-url="currentEpisodeUrl"
+        :episode-name="currentEpisodeName"
+        :poster="videoDetail?.vod_pic"
+        :visible="showVideoPlayer"
+        @close="handlePlayerClose"
+      />
 
       <!-- 视频信息卡片 -->
       <a-card class="video-info-card" :class="{ 'collapsed-when-playing': showVideoPlayer }">
@@ -145,105 +128,14 @@
 
 
 
-      <!-- 播放线路和选集 -->
-      <a-card v-if="playRoutes.length > 0" class="play-section">
-        <h3>播放线路</h3>
-        
-        <!-- 线路选择 -->
-        <div class="route-tabs">
-          <a-button
-            v-for="(route, index) in playRoutes"
-            :key="index"
-            :type="currentRoute === index ? 'primary' : 'outline'"
-            @click="switchRoute(index)"
-            class="route-btn"
-          >
-            <span class="route-name">{{ route.name }}</span>
-            <a-badge :count="route.episodes.length" class="route-badge" />
-          </a-button>
-        </div>
-
-        <!-- 选集列表 -->
-        <div v-if="currentRouteEpisodes.length > 0" class="episodes-section">
-          <div class="episodes-header">
-            <h4>选集列表 ({{ currentRouteEpisodes.length }}集)</h4>
-            <div class="episodes-controls">
-              <!-- 排序按钮 -->
-              <a-button 
-                type="text" 
-                size="small" 
-                @click="toggleEpisodeSort"
-                :title="episodeSortOrder === 'asc' ? '切换为倒序' : '切换为正序'"
-                class="sort-btn"
-              >
-                <template #icon>
-                  <icon-sort-ascending v-if="episodeSortOrder === 'asc'" />
-                  <icon-sort-descending v-else />
-                </template>
-                {{ episodeSortOrder === 'asc' ? '正序' : '倒序' }}
-              </a-button>
-              
-              <!-- 显示策略选择 -->
-              <a-select 
-                v-model="episodeDisplayStrategy" 
-                @change="changeDisplayStrategy"
-                size="small"
-                class="strategy-select"
-                :style="{ width: '150px' }"
-                position="bl"
-                :popup-container="'body'"
-              >
-                <template #prefix>
-                  <icon-settings />
-                </template>
-                <a-option value="full">完整显示</a-option>
-                <a-option value="smart">智能去重</a-option>
-                <a-option value="simple">精简显示</a-option>
-              </a-select>
-              
-              <!-- 布局选项 -->
-              <a-select 
-                v-model="episodeLayoutColumns" 
-                @change="changeLayoutColumns"
-                size="small"
-                class="layout-select"
-                :style="{ width: '120px' }"
-                position="bl"
-                :popup-container="'body'"
-              >
-                <template #prefix>
-                  <icon-menu />
-                </template>
-                <a-option value="smart">智能</a-option>
-                <a-option value="12">12列</a-option>
-                <a-option value="9">9列</a-option>
-                <a-option value="6">6列</a-option>
-                <a-option value="3">3列</a-option>
-              </a-select>
-            </div>
-          </div>
-          <div class="episodes-grid" :style="{ '--episodes-columns': actualLayoutColumns }">
-            <a-button
-              v-for="(episode, index) in currentRouteEpisodes"
-              :key="index"
-              :type="currentEpisode === index ? 'primary' : 'outline'"
-              @click="selectEpisode(index)"
-              class="episode-btn"
-              size="small"
-              :title="episode.name"
-            >
-              <span class="episode-text">{{ episode.displayName || episode.name }}</span>
-            </a-button>
-          </div>
-        </div>
-
-
-      </a-card>
-
-      <!-- 无播放资源提示 -->
-      <a-card v-else class="no-play-section">
-        <a-empty description="暂无播放资源" />
-      </a-card>
+      <!-- 播放线路和选集组件 -->
+      <EpisodeSelector 
+        :video-detail="videoDetail"
+        :current-route="currentRoute"
+        :current-episode="currentEpisode"
+        @route-change="switchRoute"
+        @episode-change="selectEpisode"
+      />
     </div>
 
     <!-- v-viewer 图片查看器 -->
@@ -264,24 +156,20 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Message } from '@arco-design/web-vue'
-import Hls from 'hls.js'
 import videoService from '@/api/services/video'
 import { useSiteStore } from '@/stores/siteStore'
 import { useFavoriteStore } from '@/stores/favoriteStore'
 import { useHistoryStore } from '@/stores/historyStore'
 import { usePageStateStore } from '@/stores/pageStateStore'
+import VideoPlayer from '@/components/players/VideoPlayer.vue'
+import EpisodeSelector from '@/components/players/EpisodeSelector.vue'
 import { 
   IconLeft, 
   IconPlayArrow, 
   IconCopy,
   IconHeart,
   IconHeartFill,
-  IconSortAscending,
-  IconSortDescending,
-  IconSettings,
-  IconMenu,
-  IconEye,
-  IconClose
+  IconEye
 } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
@@ -311,10 +199,6 @@ const descriptionExpanded = ref(false)
 const currentRoute = ref(0)
 const currentEpisode = ref(0)
 const favoriteLoading = ref(false)
-// 选集排序和显示策略
-const episodeSortOrder = ref('asc') // 'asc' 正序, 'desc' 倒序
-const episodeDisplayStrategy = ref(localStorage.getItem('episodeDisplayStrategy') || 'full') // 'full' 完整显示, 'smart' 智能去重, 'simple' 精简显示
-const episodeLayoutColumns = ref(localStorage.getItem('episodeLayoutColumns') || 'smart') // 每行显示的按钮数量，支持智能布局
 // 当前使用的站源信息（可能是全局站源或临时站源）
 const currentSiteInfo = ref({
   name: '',
@@ -324,8 +208,6 @@ const currentSiteInfo = ref({
 
 // 视频播放器相关
 const showVideoPlayer = ref(false)
-const videoPlayer = ref(null)
-const hlsInstance = ref(null)
 
 // 图片查看器相关
 const viewerImages = ref([])
@@ -377,76 +259,7 @@ const playRoutes = computed(() => {
   }))
 })
 
-const currentRouteEpisodes = computed(() => {
-  let episodes = playRoutes.value[currentRoute.value]?.episodes || []
-  
-  // 应用显示策略
-  episodes = episodes.map(episode => ({
-    ...episode,
-    displayName: processEpisodeName(episode.name)
-  }))
-  
-  // 应用排序
-  if (episodeSortOrder.value === 'desc') {
-    episodes = [...episodes].reverse()
-  }
-  
-  return episodes
-})
-
-const currentEpisodes = computed(() => {
-  return currentRouteEpisodes.value
-})
-
-const currentEpisodeUrl = computed(() => {
-  const episode = currentRouteEpisodes.value[currentEpisode.value]
-  return episode?.url || ''
-})
-
-const isCurrentFavorited = computed(() => {
-  if (!originalVideoInfo.value.id || !currentSiteInfo.value.api) return false
-  return favoriteStore.isFavorited(originalVideoInfo.value.id, currentSiteInfo.value.api)
-})
-
-// 智能布局计算属性
-const smartLayoutColumns = computed(() => {
-  if (!currentRouteEpisodes.value.length) return 12
-  
-  // 计算最长的选集名称长度
-  const maxNameLength = Math.max(...currentRouteEpisodes.value.map(episode => 
-    (episode.displayName || episode.name || '').length
-  ))
-  
-  // 以总宽度60为基础，每个字符大约占用1个单位宽度
-  // 考虑按钮的padding、margin等额外空间，每个按钮需要额外2-3个单位
-  const buttonWidth = maxNameLength + 1 // 文字宽度 + 按钮内边距等
-  
-  // 计算能容纳的列数，范围在1-12之间
-  let columns = Math.floor(60 / buttonWidth)
-  
-  // 确保列数在1-12范围内
-  columns = Math.max(1, Math.min(12, columns))
-  
-  console.log('智能布局计算:', { maxNameLength, buttonWidth, columns })
-  
-  return columns
-})
-
-// 实际使用的列数
-const actualLayoutColumns = computed(() => {
-  if (episodeLayoutColumns.value === 'smart') {
-    return smartLayoutColumns.value
-  }
-  return parseInt(episodeLayoutColumns.value) || 12
-})
-
-// 当前选集名称
-const currentEpisodeName = computed(() => {
-  const episode = currentRouteEpisodes.value[currentEpisode.value]
-  return episode?.displayName || episode?.name || '未知选集'
-})
-
-// 方法
+// 解析选集数据
 const parseEpisodes = (urlString) => {
   if (!urlString) return []
   
@@ -458,6 +271,32 @@ const parseEpisodes = (urlString) => {
     }
   }).filter(item => item.url)
 }
+
+
+
+// 当前线路的选集列表
+const currentRouteEpisodes = computed(() => {
+  return playRoutes.value[currentRoute.value]?.episodes || []
+})
+
+const currentEpisodeUrl = computed(() => {
+  const episodes = playRoutes.value[currentRoute.value]?.episodes || []
+  const episode = episodes[currentEpisode.value]
+  return episode?.url || ''
+})
+
+const currentEpisodeName = computed(() => {
+  const episodes = playRoutes.value[currentRoute.value]?.episodes || []
+  const episode = episodes[currentEpisode.value]
+  return episode?.name || '未知选集'
+})
+
+const isCurrentFavorited = computed(() => {
+  if (!originalVideoInfo.value.id || !currentSiteInfo.value.api) return false
+  return favoriteStore.isFavorited(originalVideoInfo.value.id, currentSiteInfo.value.api)
+})
+
+// 方法
 
 const loadVideoDetail = async () => {
   if (!route.params.id) {
@@ -810,6 +649,20 @@ const switchRoute = (index) => {
   currentEpisode.value = 0 // 切换线路时重置选集
 }
 
+// 处理EpisodeSelector组件的事件
+const handleRouteChange = (routeIndex) => {
+  switchRoute(routeIndex)
+}
+
+const handleEpisodeChange = (episodeIndex) => {
+  selectEpisode(episodeIndex)
+}
+
+// 处理VideoPlayer组件的关闭事件
+const handlePlayerClose = () => {
+  showVideoPlayer.value = false
+}
+
 const selectEpisode = (index) => {
   currentEpisode.value = index
   
@@ -820,11 +673,6 @@ const selectEpisode = (index) => {
   if (episodeUrl) {
     console.log('启动内置播放器播放视频:', episodeUrl)
     showVideoPlayer.value = true
-    
-    // 等待DOM更新后初始化播放器
-    nextTick(() => {
-      initVideoPlayer(episodeUrl)
-    })
     
     Message.success(`开始播放: ${currentEpisodeName.value}`)
   } else {
@@ -865,81 +713,7 @@ const selectEpisode = (index) => {
   }
 }
 
-// 选集排序切换
-const toggleEpisodeSort = () => {
-  episodeSortOrder.value = episodeSortOrder.value === 'asc' ? 'desc' : 'asc'
-  // 排序切换后需要调整当前选集索引
-  if (episodeSortOrder.value === 'desc') {
-    const totalEpisodes = playRoutes.value[currentRoute.value]?.episodes.length || 0
-    currentEpisode.value = totalEpisodes - 1 - currentEpisode.value
-  } else {
-    const totalEpisodes = playRoutes.value[currentRoute.value]?.episodes.length || 0
-    currentEpisode.value = totalEpisodes - 1 - currentEpisode.value
-  }
-}
 
-// 显示策略切换
-const changeDisplayStrategy = (strategy) => {
-  episodeDisplayStrategy.value = strategy
-  localStorage.setItem('episodeDisplayStrategy', strategy)
-}
-
-// 布局列数切换
-const changeLayoutColumns = (columns) => {
-  episodeLayoutColumns.value = columns
-  localStorage.setItem('episodeLayoutColumns', columns)
-}
-
-// 获取显示策略文本
-const getDisplayStrategyText = () => {
-  switch (episodeDisplayStrategy.value) {
-    case 'full': return '完整显示'
-    case 'smart': return '智能去重'
-    case 'simple': return '精简显示'
-    default: return '完整显示'
-  }
-}
-
-// 处理选集名称显示
-const processEpisodeName = (episodeName) => {
-  if (!episodeName) return '未知集数'
-  
-  switch (episodeDisplayStrategy.value) {
-    case 'full':
-      return episodeName
-      
-    case 'smart':
-      // 智能去重：去除与视频标题重复的部分
-      const videoTitle = originalVideoInfo.value.name || videoDetail.value?.vod_name || ''
-      if (videoTitle && episodeName.includes(videoTitle)) {
-        // 去除标题部分，保留后缀
-        let processed = episodeName.replace(videoTitle, '').trim()
-        // 去除开头的特殊字符
-        processed = processed.replace(/^[_\-\s]+/, '')
-        return processed || episodeName
-      }
-      return episodeName
-      
-    case 'simple':
-      // 精简显示：提取数字部分
-      const numberMatch = episodeName.match(/(\d+)/g)
-      if (numberMatch && numberMatch.length > 0) {
-        // 取最后一个数字，并格式化为三位数
-        const lastNumber = numberMatch[numberMatch.length - 1]
-        return String(lastNumber).padStart(3, '0')
-      }
-      // 如果没有数字，尝试提取中文数字或其他标识
-      const chineseNumberMatch = episodeName.match(/[一二三四五六七八九十百千万]+/)
-      if (chineseNumberMatch) {
-        return chineseNumberMatch[0]
-      }
-      // 如果都没有，返回原名称的简化版本
-      return episodeName.length > 6 ? episodeName.substring(0, 6) + '...' : episodeName
-      
-    default:
-      return episodeName
-  }
-}
 
 const playVideo = () => {
   // 检查是否有历史记录
@@ -977,9 +751,6 @@ const playVideo = () => {
                 
                 // 启动内置播放器
                 showVideoPlayer.value = true
-                nextTick(() => {
-                  initVideoPlayer(currentEpisodeUrl.value)
-                })
                 
                 // 更新历史记录的播放时间
                 updateHistoryRecord()
@@ -1019,9 +790,6 @@ const playFirstEpisode = () => {
             
             // 启动内置播放器
             showVideoPlayer.value = true
-            nextTick(() => {
-              initVideoPlayer(currentEpisodeUrl.value)
-            })
             
             // 添加到历史记录
             updateHistoryRecord()
@@ -1100,200 +868,9 @@ watch(() => siteStore.nowSite, (newSite, oldSite) => {
   }
 }, { deep: true })
 
-// 链接类型判断函数
-const isDirectVideoLink = (url) => {
-  if (!url) return false
-  
-  // 视频文件扩展名
-  const videoExtensions = [
-    '.mp4', '.webm', '.ogg', '.avi', '.mov', '.wmv', '.flv', '.mkv', 
-    '.m4v', '.3gp', '.ts', '.m3u8', '.mpd'
-  ]
-  
-  // 检查URL是否包含视频扩展名
-  const hasVideoExtension = videoExtensions.some(ext => 
-    url.toLowerCase().includes(ext)
-  )
-  
-  // 检查是否是流媒体格式
-  const isStreamingFormat = url.toLowerCase().includes('m3u8') || 
-                           url.toLowerCase().includes('mpd') ||
-                           url.toLowerCase().includes('rtmp') ||
-                           url.toLowerCase().includes('rtsp')
-  
-  // 检查是否看起来像网页链接
-  const looksLikeWebpage = url.includes('://') && 
-                          (url.includes('.html') || 
-                           url.includes('.php') || 
-                           url.includes('.asp') || 
-                           url.includes('.jsp') ||
-                           url.match(/\/[^.]*$/) || // 没有扩展名的路径
-                           url.includes('?') || // 包含查询参数
-                           url.includes('#')) // 包含锚点
-  
-  // 如果有视频扩展名或是流媒体格式，认为是直链
-  if (hasVideoExtension || isStreamingFormat) {
-    return true
-  }
-  
-  // 如果看起来像网页，认为不是直链
-  if (looksLikeWebpage && !hasVideoExtension && !isStreamingFormat) {
-    return false
-  }
-  
-  // 默认尝试作为直链处理
-  return true
-}
 
-// 视频播放器相关方法
-const initVideoPlayer = (url) => {
-  if (!videoPlayer.value || !url) return
-  
-  console.log('初始化视频播放器:', url)
-  
-  // 首先判断链接类型
-  if (!isDirectVideoLink(url)) {
-    console.log('检测到网页链接，在新窗口打开:', url)
-    Message.info('检测到网页链接，正在新窗口打开...')
-    window.open(url, '_blank')
-    showVideoPlayer.value = false // 关闭播放器
-    return
-  }
-  
-  // 清理之前的HLS实例
-  if (hlsInstance.value) {
-    hlsInstance.value.destroy()
-    hlsInstance.value = null
-  }
-  
-  const video = videoPlayer.value
-  
-  // 检测视频格式
-  const isM3u8 = url.toLowerCase().includes('.m3u8') || url.toLowerCase().includes('m3u8')
-  
-  if (isM3u8) {
-    // 处理m3u8格式
-    if (Hls.isSupported()) {
-      // 使用HLS.js播放m3u8
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 90
-      })
-      
-      hls.loadSource(url)
-      hls.attachMedia(video)
-      
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log('HLS manifest 解析完成，开始播放')
-        video.play().catch(err => {
-          console.warn('自动播放失败:', err)
-        })
-      })
-      
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        console.error('HLS播放错误:', data)
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              Message.error('网络错误，请检查网络连接')
-              hls.startLoad()
-              break
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              Message.error('媒体错误，尝试恢复播放')
-              hls.recoverMediaError()
-              break
-            default:
-              // 播放器错误时，检查是否为网页链接
-              if (!isDirectVideoLink(url)) {
-                console.log('HLS播放失败，检测到可能是网页链接，在新窗口打开:', url)
-                Message.info('视频播放失败，检测到网页链接，正在新窗口打开...')
-                window.open(url, '_blank')
-                showVideoPlayer.value = false // 关闭播放器
-              } else {
-                Message.error('播放器错误，请重试')
-              }
-              hls.destroy()
-              break
-          }
-        }
-      })
-      
-      hlsInstance.value = hls
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari原生支持HLS
-      video.src = url
-      video.addEventListener('loadedmetadata', () => {
-        video.play().catch(err => {
-          console.warn('自动播放失败:', err)
-        })
-      })
-    } else {
-      Message.error('您的浏览器不支持HLS播放')
-    }
-  } else {
-    // 处理其他格式的视频（mp4, webm, avi等）
-    console.log('播放普通视频格式:', url)
-    video.src = url
-    
-    // 添加事件监听器
-    const handleLoadedMetadata = () => {
-      console.log('视频元数据加载完成，开始播放')
-      video.play().catch(err => {
-        console.warn('自动播放失败:', err)
-        Message.warning('自动播放失败，请手动点击播放')
-      })
-    }
-    
-    const handleError = (e) => {
-      console.error('视频播放错误:', e)
-      
-      // 如果播放失败，再次检查是否为网页链接
-      if (!isDirectVideoLink(url)) {
-        console.log('播放失败，检测到可能是网页链接，在新窗口打开:', url)
-        Message.info('视频播放失败，检测到网页链接，正在新窗口打开...')
-        window.open(url, '_blank')
-        showVideoPlayer.value = false // 关闭播放器
-      } else {
-        Message.error('视频播放失败，请检查视频链接或格式')
-      }
-    }
-    
-    const handleLoadStart = () => {
-      console.log('开始加载视频')
-    }
-    
-    // 移除之前的事件监听器（如果有）
-    video.removeEventListener('loadedmetadata', handleLoadedMetadata)
-    video.removeEventListener('error', handleError)
-    video.removeEventListener('loadstart', handleLoadStart)
-    
-    // 添加新的事件监听器
-    video.addEventListener('loadedmetadata', handleLoadedMetadata)
-    video.addEventListener('error', handleError)
-    video.addEventListener('loadstart', handleLoadStart)
-    
-    // 开始加载视频
-    video.load()
-  }
-}
 
-const closeVideoPlayer = () => {
-  console.log('关闭视频播放器')
-  showVideoPlayer.value = false
-  
-  // 停止播放
-  if (videoPlayer.value) {
-    videoPlayer.value.pause()
-    videoPlayer.value.currentTime = 0
-  }
-  
-  // 清理HLS实例
-  if (hlsInstance.value) {
-    hlsInstance.value.destroy()
-    hlsInstance.value = null
-  }
-}
+
 
 // 组件挂载时的初始化（watch已经设置了immediate: true，无需重复调用）
 onMounted(() => {
@@ -1302,11 +879,7 @@ onMounted(() => {
 
 // 组件卸载时清理资源
 onUnmounted(() => {
-  console.log('VideoDetail组件卸载，清理播放器资源')
-  if (hlsInstance.value) {
-    hlsInstance.value.destroy()
-    hlsInstance.value = null
-  }
+  console.log('VideoDetail组件卸载')
 })
 </script>
 
