@@ -3,26 +3,76 @@
     <div class="player-header">
       <h3>正在播放: {{ episodeName }}</h3>
       <div class="player-controls">
-        <a-select 
-          :model-value="playerType" 
-          @change="handlePlayerTypeChange"
-          size="small" 
-          style="width: 120px; margin-right: 8px;"
-        >
-          <a-option value="default">默认播放器</a-option>
-          <a-option value="artplayer">ArtPlayer</a-option>
-        </a-select>
-        <a-button @click="closePlayer" size="small" type="outline">
-          <template #icon>
-            <icon-close />
-          </template>
-          关闭播放器
-        </a-button>
+
+        
+        <div class="compact-button-group">
+          <div class="compact-btn" @click="toggleAutoNext" :class="{ active: autoNextEnabled }" v-if="props.episodes.length > 1">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 5v14l11-7z" fill="currentColor"/>
+            </svg>
+            <span class="btn-text">自动连播</span>
+          </div>
+          
+          <div class="compact-btn" @click="toggleCountdown" :class="{ active: countdownEnabled }" v-if="props.episodes.length > 1">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+              <polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <span class="btn-text">倒计时</span>
+          </div>
+          
+          <div class="compact-btn selector-btn">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <a-select
+              :model-value="playerType"
+              @change="handlePlayerTypeChange"
+              class="compact-select"
+              size="small"
+            >
+              <a-option value="default">默认播放器</a-option>
+              <a-option value="artplayer">ArtPlayer</a-option>
+            </a-select>
+          </div>
+          
+          <div class="compact-btn close-btn" @click="closePlayer">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
+              <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <span class="btn-text">关闭</span>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="art-player-container">
-      <div ref="artPlayerContainer" class="art-player"></div>
+    <div class="art-player-wrapper" v-show="props.visible">
+    
+    <div ref="artPlayerContainer" class="art-player-container">
+      <!-- ArtPlayer 将在这里初始化 -->
     </div>
+    
+    <!-- 自动下一集倒计时弹窗 -->
+    <div v-if="showAutoNextDialog" class="auto-next-dialog">
+      <div class="auto-next-content">
+        <div class="auto-next-title">
+          <span>即将播放下一集</span>
+        </div>
+        <div class="auto-next-episode" v-if="getNextEpisode()">
+          {{ getNextEpisode().name }}
+        </div>
+        <div class="auto-next-countdown">
+          {{ autoNextCountdown }} 秒后自动播放
+        </div>
+        <div class="auto-next-buttons">
+          <button @click="playNextEpisode" class="btn-play-now">立即播放</button>
+          <button @click="cancelAutoNext" class="btn-cancel">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
   </a-card>
 </template>
 
@@ -33,7 +83,7 @@ import { IconClose } from '@arco-design/web-vue/es/icon'
 import Artplayer from 'artplayer'
 import Hls from 'hls.js'
 
-// Props - 已添加 HLS 支持和动态高度自适应
+// Props - 已添加 HLS 支持、动态高度自适应和自动下一集功能
 const props = defineProps({
   visible: {
     type: Boolean,
@@ -54,11 +104,24 @@ const props = defineProps({
   playerType: {
     type: String,
     default: 'artplayer'
+  },
+  // 自动下一集功能相关 props
+  episodes: {
+    type: Array,
+    default: () => []
+  },
+  currentEpisodeIndex: {
+    type: Number,
+    default: 0
+  },
+  autoNext: {
+    type: Boolean,
+    default: true
   }
 })
 
 // Emits
-const emit = defineEmits(['close', 'error', 'player-change'])
+const emit = defineEmits(['close', 'error', 'player-change', 'next-episode'])
 
 // 响应式数据
 const artPlayerContainer = ref(null)
@@ -67,6 +130,13 @@ const retryCount = ref(0) // 重连次数计数器
 const maxRetries = ref(3) // 最大重连次数
 const isRetrying = ref(false) // 是否正在重连
 const dynamicHeight = ref(450) // 动态计算的高度
+
+// 自动下一集功能相关数据
+const autoNextEnabled = ref(true) // 自动下一集开关，默认关闭
+const autoNextCountdown = ref(0) // 自动下一集倒计时
+const autoNextTimer = ref(null) // 自动下一集定时器
+const showAutoNextDialog = ref(false) // 显示自动下一集对话框
+const countdownEnabled = ref(false) // 倒计时开关，默认关闭
 
 // 链接类型判断函数
 const isDirectVideoLink = (url) => {
@@ -245,6 +315,15 @@ const initArtPlayer = async (url) => {
       controls: [
         {
           position: 'right',
+          html: hasNextEpisode() ? '下一集' : '',
+          tooltip: hasNextEpisode() ? '播放下一集' : '',
+          style: hasNextEpisode() ? {} : { display: 'none' },
+          click: function () {
+            playNextEpisode()
+          },
+        },
+        {
+          position: 'right',
           html: '关闭',
           tooltip: '关闭播放器',
           click: function () {
@@ -313,8 +392,20 @@ const initArtPlayer = async (url) => {
       handleRetry(url)
     })
 
+    art.on('video:ended', () => {
+      console.log('视频播放结束')
+      // 视频结束时启动自动下一集
+      if (autoNextEnabled.value && hasNextEpisode()) {
+        startAutoNextCountdown()
+      } else if (!hasNextEpisode()) {
+        Message.info('全部播放完毕')
+      }
+    })
+
     art.on('destroy', () => {
       console.log('ArtPlayer 已销毁')
+      // 清理自动下一集相关资源
+      cancelAutoNext()
     })
 
     artPlayerInstance.value = art
@@ -420,6 +511,97 @@ const calculateDynamicHeight = () => {
   return Math.round(calculatedHeight)
 }
 
+// 自动下一集功能相关函数
+
+// 检查是否有下一集
+const hasNextEpisode = () => {
+  return props.episodes.length > 0 && props.currentEpisodeIndex < props.episodes.length - 1
+}
+
+// 获取下一集信息
+const getNextEpisode = () => {
+  if (!hasNextEpisode()) return null
+  return props.episodes[props.currentEpisodeIndex + 1]
+}
+
+// 开始自动下一集倒计时
+const startAutoNextCountdown = () => {
+  if (!autoNextEnabled.value || !hasNextEpisode()) return
+  
+  console.log('开始自动下一集')
+  
+  // 如果开启了倒计时，显示倒计时弹窗
+  if (countdownEnabled.value) {
+    autoNextCountdown.value = 10 // 10秒倒计时
+    showAutoNextDialog.value = true
+    
+    autoNextTimer.value = setInterval(() => {
+      autoNextCountdown.value--
+      
+      if (autoNextCountdown.value <= 0) {
+        clearInterval(autoNextTimer.value)
+        autoNextTimer.value = null
+        showAutoNextDialog.value = false
+        playNextEpisode()
+      }
+    }, 1000)
+  } else {
+    // 直接播放下一集，不显示倒计时
+    playNextEpisode()
+  }
+}
+
+// 取消自动下一集
+const cancelAutoNext = () => {
+  if (autoNextTimer.value) {
+    clearInterval(autoNextTimer.value)
+    autoNextTimer.value = null
+  }
+  autoNextCountdown.value = 0
+  showAutoNextDialog.value = false
+  console.log('用户取消自动下一集')
+}
+
+// 立即播放下一集
+const playNextEpisode = () => {
+  if (!hasNextEpisode()) {
+    console.log('已经是最后一集')
+    Message.info('已经是最后一集了')
+    return
+  }
+  
+  const nextEpisode = getNextEpisode()
+  console.log('播放下一集:', nextEpisode.name)
+  
+  // 清理倒计时
+  cancelAutoNext()
+  
+  // 通知父组件切换到下一集
+  emit('next-episode', props.currentEpisodeIndex + 1)
+  
+  Message.success(`开始播放: ${nextEpisode.name}`)
+}
+
+// 切换自动下一集开关
+const toggleAutoNext = () => {
+  autoNextEnabled.value = !autoNextEnabled.value
+  console.log('自动下一集开关:', autoNextEnabled.value ? '开启' : '关闭')
+  
+  if (!autoNextEnabled.value) {
+    cancelAutoNext()
+  }
+}
+
+// 切换倒计时开关
+const toggleCountdown = () => {
+  countdownEnabled.value = !countdownEnabled.value
+  console.log('倒计时开关:', countdownEnabled.value ? '开启' : '关闭')
+  
+  if (!countdownEnabled.value) {
+    cancelAutoNext()
+  }
+}
+
 // 监听视频URL变化
 watch(() => props.videoUrl, async (newUrl) => {
   if (newUrl && props.visible) {
@@ -465,9 +647,15 @@ onMounted(() => {
 
 // 组件卸载时清理资源
 onUnmounted(() => {
-  console.log('ArtVideoPlayer组件卸载，清理播放器资源')
-  // 移除窗口大小变化监听
+  console.log('ArtVideoPlayer 组件即将卸载')
+  
+  // 移除窗口大小变化监听器
   window.removeEventListener('resize', handleResize)
+  
+  // 清理自动下一集相关资源
+  cancelAutoNext()
+  
+  // 销毁播放器实例
   if (artPlayerInstance.value) {
     artPlayerInstance.value.destroy()
     artPlayerInstance.value = null
@@ -489,17 +677,22 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  padding: 12px 16px;
+  /* background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); */
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .player-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-text-1);
   margin: 0;
+  color: #2c3e50;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .player-controls {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 
@@ -550,5 +743,189 @@ onUnmounted(() => {
 
 :deep(.art-control:hover) {
   color: #23ade5;
+}
+
+/* 紧凑按钮组样式 */
+.compact-button-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.compact-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  height: 28px;
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.compact-btn:hover {
+  background: #f5f5f5;
+  border-color: #40a9ff;
+  color: #40a9ff;
+}
+
+.compact-btn.active {
+  background: #1890ff;
+  border-color: #1890ff;
+  color: white;
+}
+
+.compact-btn.active:hover {
+  background: #40a9ff;
+  border-color: #40a9ff;
+}
+
+.compact-btn .btn-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.compact-btn .btn-text {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* 选择框按钮特殊样式 */
+.compact-btn.selector-btn {
+  padding: 4px 6px;
+  position: relative;
+}
+
+.compact-btn.selector-btn .compact-select {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 11px;
+  min-width: 60px;
+  height: 20px;
+}
+
+:deep(.compact-btn.selector-btn .compact-select .arco-select-view-single) {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  height: 20px !important;
+  min-height: 20px !important;
+}
+
+:deep(.compact-btn.selector-btn .compact-select .arco-select-view-value) {
+  color: inherit !important;
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 20px;
+  padding: 0 !important;
+}
+
+:deep(.compact-btn.selector-btn .compact-select .arco-select-view-suffix) {
+  color: inherit !important;
+  font-size: 10px;
+}
+
+/* 关闭按钮特殊样式 */
+.compact-btn.close-btn {
+  background: #fff2f0;
+  border-color: #ffccc7;
+  color: #ff4d4f;
+}
+
+.compact-btn.close-btn:hover {
+  background: #ff4d4f;
+  border-color: #ff4d4f;
+  color: white;
+}
+
+ /* 自动下一集倒计时弹窗样式 */
+ .auto-next-dialog {
+   position: absolute;
+   top: 50%;
+   left: 50%;
+   transform: translate(-50%, -50%);
+   background: rgba(0, 0, 0, 0.9);
+   color: white;
+   padding: 20px;
+   border-radius: 8px;
+   text-align: center;
+   z-index: 1000;
+   min-width: 280px;
+   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+ }
+
+.auto-next-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auto-next-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.auto-next-episode {
+  font-size: 14px;
+  color: #23ade5;
+  font-weight: 500;
+}
+
+.auto-next-countdown {
+  font-size: 18px;
+  font-weight: bold;
+  color: #ff6b6b;
+}
+
+.auto-next-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.btn-play-now,
+.btn-cancel {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-play-now {
+  background: #23ade5;
+  color: white;
+}
+
+.btn-play-now:hover {
+  background: #1890d5;
+}
+
+.btn-cancel {
+  background: #666;
+  color: white;
+}
+
+.btn-cancel:hover {
+  background: #555;
 }
 </style>

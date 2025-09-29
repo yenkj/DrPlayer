@@ -3,21 +3,48 @@
     <div class="player-header">
       <h3>正在播放: {{ episodeName }}</h3>
       <div class="player-controls">
-        <a-select 
-          :model-value="playerType" 
-          @change="handlePlayerTypeChange"
-          size="small" 
-          style="width: 120px; margin-right: 8px;"
-        >
-          <a-option value="default">默认播放器</a-option>
-          <a-option value="artplayer">ArtPlayer</a-option>
-        </a-select>
-        <a-button @click="closePlayer" size="small" type="outline">
-          <template #icon>
-            <icon-close />
-          </template>
-          关闭播放器
-        </a-button>
+        <div class="compact-button-group">
+          <div class="compact-btn" :class="{ active: autoNext }" @click="toggleAutoNext">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 3l14 9-14 9V3z" fill="currentColor"/>
+              <path d="M19 3v18" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <span class="btn-text">自动连播</span>
+          </div>
+          
+          <div class="compact-btn" :class="{ active: showCountdown }" @click="toggleCountdown">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+              <polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <span class="btn-text">倒计时</span>
+          </div>
+          
+          <div class="compact-btn selector-btn">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <a-select
+              :model-value="playerType"
+              @change="handlePlayerTypeChange"
+              class="compact-select"
+              size="small"
+            >
+              <a-option value="default">默认播放器</a-option>
+              <a-option value="artplayer">ArtPlayer</a-option>
+            </a-select>
+          </div>
+          
+          <div class="compact-btn close-btn" @click="closePlayer">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
+              <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <span class="btn-text">关闭</span>
+          </div>
+        </div>
       </div>
     </div>
     <div class="video-player-container">
@@ -71,6 +98,18 @@ const emit = defineEmits(['close', 'error', 'player-change'])
 // 响应式数据
 const videoPlayer = ref(null)
 const hlsInstance = ref(null)
+const autoNext = ref(false)
+const showCountdown = ref(false)
+
+// 切换自动连播
+const toggleAutoNext = () => {
+  autoNext.value = !autoNext.value
+}
+
+// 切换倒计时显示
+const toggleCountdown = () => {
+  showCountdown.value = !showCountdown.value
+}
 
 // 链接类型判断函数
 const isDirectVideoLink = (url) => {
@@ -325,18 +364,97 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  padding: 12px 16px;
+  /* background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); */
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .player-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-text-1);
   margin: 0;
+  color: #2c3e50;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .player-controls {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.compact-button-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.compact-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  height: 28px;
+  background: white;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  color: #666;
+}
+
+.compact-btn:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+}
+
+.compact-btn.active {
+  background: #1890ff;
+  border-color: #1890ff;
+  color: white;
+}
+
+.compact-btn.close-btn {
+  background: #ff4d4f;
+  border-color: #ff4d4f;
+  color: white;
+}
+
+.compact-btn.close-btn:hover {
+  background: #ff7875;
+  border-color: #ff7875;
+}
+
+.btn-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.btn-text {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.compact-select {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 12px;
+  min-width: 80px;
+}
+
+.compact-select .arco-select-view-single {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: auto !important;
+}
+
+.selector-btn {
+  min-width: 120px;
 }
 
 .video-player-container {

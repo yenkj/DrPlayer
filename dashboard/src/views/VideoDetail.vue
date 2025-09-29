@@ -68,8 +68,12 @@
         :poster="videoDetail?.vod_pic"
         :visible="showVideoPlayer"
         :player-type="playerType"
+        :episodes="currentRouteEpisodes"
+        :current-episode-index="currentEpisodeIndex"
+        :auto-next="true"
         @close="handlePlayerClose"
         @player-change="handlePlayerTypeChange"
+        @next-episode="handleNextEpisode"
       />
 
       <!-- 视频信息卡片 -->
@@ -305,6 +309,10 @@ const currentEpisodeName = computed(() => {
   const episodes = playRoutes.value[currentRoute.value]?.episodes || []
   const episode = episodes[currentEpisode.value]
   return episode?.name || '未知选集'
+})
+
+const currentEpisodeIndex = computed(() => {
+  return currentEpisode.value
 })
 
 const isCurrentFavorited = computed(() => {
@@ -682,6 +690,19 @@ const handlePlayerClose = () => {
 // 处理播放器类型变更
 const handlePlayerTypeChange = (newType) => {
   playerType.value = newType
+}
+
+// 处理自动下一集事件
+const handleNextEpisode = (nextEpisodeIndex) => {
+  console.log('切换到下一集:', nextEpisodeIndex)
+  
+  // 检查索引是否有效
+  if (nextEpisodeIndex >= 0 && nextEpisodeIndex < currentRouteEpisodes.value.length) {
+    selectEpisode(nextEpisodeIndex)
+  } else {
+    console.warn('无效的选集索引:', nextEpisodeIndex)
+    Message.warning('无法播放下一集')
+  }
 }
 
 const selectEpisode = (index) => {
