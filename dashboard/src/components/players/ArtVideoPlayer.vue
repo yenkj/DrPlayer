@@ -579,7 +579,8 @@ const playNextEpisode = () => {
   // 通知父组件切换到下一集
   emit('next-episode', props.currentEpisodeIndex + 1)
   
-  Message.success(`开始播放: ${nextEpisode.name}`)
+  // 移除重复的播放提示，由父组件VideoDetail统一处理
+  // Message.success(`开始播放: ${nextEpisode.name}`)
 }
 
 // 切换自动下一集开关
