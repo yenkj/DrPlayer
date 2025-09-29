@@ -114,15 +114,21 @@ const handleVideoClick = (video) => {
   if (video && video.vod_id) {
     // 检查是否为action类型
     if (video.vod_tag === 'action') {
-      // 调用ActionRenderer处理action
-      currentActionData.value = {
-        actionId: video.vod_id,
-        title: video.vod_name,
-        pic: video.vod_pic,
-        remarks: video.vod_remarks
-      };
-      showActionRenderer.value = true;
-      return;
+      try {
+        // 解析vod_id中的JSON字符串获取action配置
+        const actionConfig = JSON.parse(video.vod_id);
+        console.log('VideoGrid解析action配置:', actionConfig);
+        
+        // 传递解析后的action配置给ActionRenderer
+        currentActionData.value = actionConfig;
+        showActionRenderer.value = true;
+        return;
+      } catch (error) {
+        console.error('VideoGrid解析action配置失败:', error, 'vod_id:', video.vod_id);
+        // 如果解析失败，显示错误信息
+        alert(`Action配置解析失败: ${error.message}`);
+        return;
+      }
     }
     
     // 记录最后点击的视频
