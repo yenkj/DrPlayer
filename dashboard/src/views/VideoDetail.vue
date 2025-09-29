@@ -178,20 +178,22 @@
                 @change="changeLayoutColumns"
                 size="small"
                 class="layout-select"
-                :style="{ width: '110px' }"
+                :style="{ width: '120px' }"
                 position="bl"
                 :popup-container="'body'"
               >
                 <template #prefix>
                   <icon-menu />
                 </template>
-                <a-option :value="12">12列</a-option>
-                <a-option :value="6">6列</a-option>
-                <a-option :value="3">3列</a-option>
+                <a-option value="smart">智能</a-option>
+                <a-option value="12">12列</a-option>
+                <a-option value="9">9列</a-option>
+                <a-option value="6">6列</a-option>
+                <a-option value="3">3列</a-option>
               </a-select>
             </div>
           </div>
-          <div class="episodes-grid" :style="{ '--episodes-columns': episodeLayoutColumns }">
+          <div class="episodes-grid" :style="{ '--episodes-columns': actualLayoutColumns }">
             <a-button
               v-for="(episode, index) in currentRouteEpisodes"
               :key="index"
@@ -281,7 +283,7 @@ const favoriteLoading = ref(false)
 // 选集排序和显示策略
 const episodeSortOrder = ref('asc') // 'asc' 正序, 'desc' 倒序
 const episodeDisplayStrategy = ref(localStorage.getItem('episodeDisplayStrategy') || 'full') // 'full' 完整显示, 'smart' 智能去重, 'simple' 精简显示
-const episodeLayoutColumns = ref(parseInt(localStorage.getItem('episodeLayoutColumns')) || 12) // 每行显示的按钮数量
+const episodeLayoutColumns = ref(localStorage.getItem('episodeLayoutColumns') || 'smart') // 每行显示的按钮数量，支持智能布局
 // 当前使用的站源信息（可能是全局站源或临时站源）
 const currentSiteInfo = ref({
   name: '',
@@ -368,6 +370,38 @@ const currentEpisodeUrl = computed(() => {
 const isCurrentFavorited = computed(() => {
   if (!originalVideoInfo.value.id || !currentSiteInfo.value.api) return false
   return favoriteStore.isFavorited(originalVideoInfo.value.id, currentSiteInfo.value.api)
+})
+
+// 智能布局计算属性
+const smartLayoutColumns = computed(() => {
+  if (!currentRouteEpisodes.value.length) return 12
+  
+  // 计算最长的选集名称长度
+  const maxNameLength = Math.max(...currentRouteEpisodes.value.map(episode => 
+    (episode.displayName || episode.name || '').length
+  ))
+  
+  // 以总宽度60为基础，每个字符大约占用1个单位宽度
+  // 考虑按钮的padding、margin等额外空间，每个按钮需要额外2-3个单位
+  const buttonWidth = maxNameLength + 1 // 文字宽度 + 按钮内边距等
+  
+  // 计算能容纳的列数，范围在1-12之间
+  let columns = Math.floor(60 / buttonWidth)
+  
+  // 确保列数在1-12范围内
+  columns = Math.max(1, Math.min(12, columns))
+  
+  console.log('智能布局计算:', { maxNameLength, buttonWidth, columns })
+  
+  return columns
+})
+
+// 实际使用的列数
+const actualLayoutColumns = computed(() => {
+  if (episodeLayoutColumns.value === 'smart') {
+    return smartLayoutColumns.value
+  }
+  return parseInt(episodeLayoutColumns.value) || 12
 })
 
 // 方法
@@ -791,7 +825,7 @@ const changeDisplayStrategy = (strategy) => {
 
 // 布局列数切换
 const changeLayoutColumns = (columns) => {
-  episodeLayoutColumns.value = parseInt(columns)
+  episodeLayoutColumns.value = columns
   localStorage.setItem('episodeLayoutColumns', columns)
 }
 
