@@ -77,6 +77,7 @@
         @close="handlePlayerClose"
         @player-change="handlePlayerTypeChange"
         @next-episode="handleNextEpisode"
+        @episode-selected="handleEpisodeSelected"
       />
 
       <!-- 视频信息卡片 -->
@@ -230,7 +231,29 @@ const currentSiteInfo = ref({
 
 // 视频播放器相关
 const showVideoPlayer = ref(false)
-const playerType = ref('default') // 'default' 或 'artplayer'
+
+// 从localStorage读取用户的播放器偏好，默认为'default'
+const getPlayerPreference = () => {
+  try {
+    const saved = localStorage.getItem('drplayer_preferred_player_type')
+    return saved && ['default', 'artplayer'].includes(saved) ? saved : 'default'
+  } catch (error) {
+    console.warn('读取播放器偏好失败:', error)
+    return 'default'
+  }
+}
+
+// 保存播放器偏好到localStorage
+const savePlayerPreference = (type) => {
+  try {
+    localStorage.setItem('drplayer_preferred_player_type', type)
+    console.log('播放器偏好已保存:', type)
+  } catch (error) {
+    console.warn('保存播放器偏好失败:', error)
+  }
+}
+
+const playerType = ref(getPlayerPreference()) // 'default' 或 'artplayer'
 
 // 图片查看器相关
 const viewerImages = ref([])
@@ -366,6 +389,10 @@ const loadVideoDetail = async () => {
     let module, apiUrl, siteName, extend
     
     if ((fromCollection || fromHistory || fromPush||fromSpecialAction) && route.query.tempSiteKey) {
+      // 调试：打印接收到的路由参数
+      console.log('VideoDetail接收到的路由参数:', route.query)
+      console.log('tempSiteExt参数值:', route.query.tempSiteExt)
+      
       // 从收藏、历史或推送进入，使用临时站源信息，不影响全局状态
       module = route.query.tempSiteKey
       apiUrl = route.query.tempSiteApi
@@ -495,7 +522,8 @@ const toggleFavorite = async () => {
         // API信息使用当前站源信息
         module: currentSiteInfo.value.key,
         api_url: currentSiteInfo.value.api,
-        site_name: currentSiteInfo.value.name
+        site_name: currentSiteInfo.value.name,
+        ext: currentSiteInfo.value.ext || null  // 添加站源扩展配置
       }
       
       const success = favoriteStore.addFavorite(favoriteData)
@@ -692,7 +720,11 @@ const handlePlayerClose = () => {
 
 // 处理播放器类型变更
 const handlePlayerTypeChange = (newType) => {
+  console.log('切换播放器类型:', newType)
   playerType.value = newType
+  
+  // 保存用户的播放器偏好
+  savePlayerPreference(newType)
 }
 
 // 处理自动下一集事件
@@ -705,6 +737,23 @@ const handleNextEpisode = (nextEpisodeIndex) => {
   } else {
     console.warn('无效的选集索引:', nextEpisodeIndex)
     Message.warning('无法播放下一集')
+  }
+}
+
+// 处理选集选择事件
+const handleEpisodeSelected = (episode) => {
+  console.log('从播放器选择剧集:', episode)
+  
+  // 查找选集在当前路线中的索引
+  const episodeIndex = currentRouteEpisodes.value.findIndex(ep => 
+    ep.name === episode.name && ep.url === episode.url
+  )
+  
+  if (episodeIndex !== -1) {
+    selectEpisode(episodeIndex)
+  } else {
+    console.warn('未找到选集:', episode)
+    Message.warning('选集切换失败')
   }
 }
 
@@ -739,7 +788,8 @@ const selectEpisode = (index) => {
       api_info: {
         module: currentSiteInfo.value.key,
         api_url: currentSiteInfo.value.api,
-        site_name: currentSiteInfo.value.name
+        site_name: currentSiteInfo.value.name,
+        ext: currentSiteInfo.value.ext || null  // 添加站源扩展配置
       }
     }
     
@@ -753,6 +803,12 @@ const selectEpisode = (index) => {
       index: index,
       url: currentRouteEpisodes.value[index].url
     }
+    
+    // 调试：检查添加历史记录时的ext参数
+    console.log('=== 添加历史记录调试 ===')
+    console.log('currentSiteInfo.value.ext:', currentSiteInfo.value.ext)
+    console.log('videoInfo.api_info.ext:', videoInfo.api_info.ext)
+    console.log('=== 调试结束 ===')
     
     historyStore.addToHistory(videoInfo, routeInfo, episodeInfo)
   }
@@ -819,29 +875,86 @@ const playVideo = () => {
   }
 }
 
+// 智能查找第一个m3u8选集
+const findFirstM3u8Episode = () => {
+  console.log('开始智能查找第一个m3u8选集...')
+  
+  // 遍历所有线路
+  for (let routeIndex = 0; routeIndex < playRoutes.value.length; routeIndex++) {
+    const route = playRoutes.value[routeIndex]
+    console.log(`检查线路 ${routeIndex}: ${route.name}`)
+    
+    // 遍历当前线路的所有选集
+    for (let episodeIndex = 0; episodeIndex < route.episodes.length; episodeIndex++) {
+      const episode = route.episodes[episodeIndex]
+      
+      // 检查URL是否包含m3u8
+      if (episode.url && episode.url.toLowerCase().includes('.m3u8')) {
+        console.log(`找到第一个m3u8选集: 线路${routeIndex} - ${episode.name}`)
+        return {
+          routeIndex,
+          episodeIndex,
+          route: route.name,
+          episode: episode.name,
+          url: episode.url
+        }
+      }
+    }
+  }
+  
+  console.log('未找到m3u8选集，将使用默认选集')
+  return null
+}
+
 const playFirstEpisode = () => {
-  // 播放第一个线路的第一个选集（受排序影响）
-  if (playRoutes.value.length > 0) {
-    currentRoute.value = 0
+  // 首先尝试智能查找第一个m3u8选集
+  const m3u8Episode = findFirstM3u8Episode()
+  
+  if (m3u8Episode) {
+    // 找到m3u8选集，播放该选集
+    console.log(`智能播放m3u8选集: ${m3u8Episode.route} - ${m3u8Episode.episode}`)
+    currentRoute.value = m3u8Episode.routeIndex
     
     nextTick(() => {
-      if (currentRouteEpisodes.value.length > 0) {
-        currentEpisode.value = 0
-        
-        nextTick(() => {
-          if (currentEpisodeUrl.value) {
-            console.log('播放第一个选集:', currentRouteEpisodes.value[0].name)
-            Message.info(`开始播放: ${currentRouteEpisodes.value[0].name}`)
-            
-            // 启动内置播放器
-            showVideoPlayer.value = true
-            
-            // 添加到历史记录
-            updateHistoryRecord()
-          }
-        })
-      }
+      currentEpisode.value = m3u8Episode.episodeIndex
+      
+      nextTick(() => {
+        if (currentEpisodeUrl.value) {
+          console.log('播放m3u8选集:', m3u8Episode.episode)
+          Message.info(`智能播放: ${m3u8Episode.episode}`)
+          
+          // 启动内置播放器
+          showVideoPlayer.value = true
+          
+          // 添加到历史记录
+          updateHistoryRecord()
+        }
+      })
     })
+  } else {
+    // 未找到m3u8选集，播放第一个线路的第一个选集（默认行为）
+    if (playRoutes.value.length > 0) {
+      currentRoute.value = 0
+      
+      nextTick(() => {
+        if (currentRouteEpisodes.value.length > 0) {
+          currentEpisode.value = 0
+          
+          nextTick(() => {
+            if (currentEpisodeUrl.value) {
+              console.log('播放默认选集:', currentRouteEpisodes.value[0].name)
+              Message.info(`开始播放: ${currentRouteEpisodes.value[0].name}`)
+              
+              // 启动内置播放器
+              showVideoPlayer.value = true
+              
+              // 添加到历史记录
+              updateHistoryRecord()
+            }
+          })
+        }
+      })
+    }
   }
 }
 
@@ -860,7 +973,8 @@ const updateHistoryRecord = () => {
       api_info: {
         module: currentSiteInfo.value.key,
         api_url: currentSiteInfo.value.api,
-        site_name: currentSiteInfo.value.name
+        site_name: currentSiteInfo.value.name,
+        ext: currentSiteInfo.value.ext || null  // 添加站源扩展配置
       }
     }
     
@@ -874,6 +988,12 @@ const updateHistoryRecord = () => {
       index: currentEpisode.value,
       url: currentRouteEpisodes.value[currentEpisode.value].url
     }
+    
+    // 调试：检查更新历史记录时的ext参数
+    console.log('=== 更新历史记录调试 ===')
+    console.log('currentSiteInfo.value.ext:', currentSiteInfo.value.ext)
+    console.log('videoInfo.api_info.ext:', videoInfo.api_info.ext)
+    console.log('=== 调试结束 ===')
     
     historyStore.addToHistory(videoInfo, routeInfo, episodeInfo)
   }

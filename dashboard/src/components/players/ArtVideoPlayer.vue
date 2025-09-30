@@ -72,6 +72,29 @@
         </div>
       </div>
     </div>
+    
+    <!-- 选集列表弹窗 -->
+    <div v-if="showEpisodeDialog" class="episode-dialog">
+      <div class="episode-dialog-overlay" @click="closeEpisodeDialog"></div>
+      <div class="episode-dialog-content">
+        <div class="episode-dialog-header">
+          <h3>选择集数</h3>
+          <button @click="closeEpisodeDialog" class="episode-close-btn">×</button>
+        </div>
+        <div ref="episodeListRef" class="episode-list">
+          <button 
+            v-for="(episode, index) in props.episodes" 
+            :key="index"
+            :ref="el => { if (index === props.currentEpisodeIndex) currentEpisodeRef = el }"
+            @click="selectEpisode(episode)"
+            :class="['episode-item', { 'current': index === props.currentEpisodeIndex }]"
+          >
+            <span class="episode-number">{{ index + 1 }}</span>
+            <span class="episode-name">{{ episode.name || `第${index + 1}集` }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
   </a-card>
 </template>
@@ -121,7 +144,7 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['close', 'error', 'player-change', 'next-episode'])
+const emit = defineEmits(['close', 'error', 'player-change', 'next-episode', 'episode-selected'])
 
 // 响应式数据
 const artPlayerContainer = ref(null)
@@ -137,6 +160,11 @@ const autoNextCountdown = ref(0) // 自动下一集倒计时
 const autoNextTimer = ref(null) // 自动下一集定时器
 const showAutoNextDialog = ref(false) // 显示自动下一集对话框
 const countdownEnabled = ref(false) // 倒计时开关，默认关闭
+
+// 选集弹窗相关数据
+const showEpisodeDialog = ref(false) // 显示选集弹窗
+const episodeListRef = ref(null) // 选集列表容器引用
+const currentEpisodeRef = ref(null) // 当前选集按钮引用
 
 // 链接类型判断函数
 const isDirectVideoLink = (url) => {
@@ -320,6 +348,15 @@ const initArtPlayer = async (url) => {
           style: hasNextEpisode() ? {} : { display: 'none' },
           click: function () {
             playNextEpisode()
+          },
+        },
+        {
+          position: 'right',
+          html: props.episodes.length > 1 ? '选集' : '',
+          tooltip: props.episodes.length > 1 ? '选择集数' : '',
+          style: props.episodes.length > 1 ? {} : { display: 'none' },
+          click: function () {
+            toggleEpisodeDialog()
           },
         },
         {
@@ -601,6 +638,79 @@ const toggleCountdown = () => {
   if (!countdownEnabled.value) {
     cancelAutoNext()
   }
+}
+
+// 滚动到当前选集位置
+const scrollToCurrentEpisode = async () => {
+  // 等待DOM更新
+  await nextTick()
+  
+  if (!episodeListRef.value || props.currentEpisodeIndex < 0) {
+    return
+  }
+  
+  // 查找当前选集按钮
+  const currentButton = episodeListRef.value.querySelector('.episode-item.current')
+  if (!currentButton) {
+    return
+  }
+  
+  const container = episodeListRef.value
+  const containerHeight = container.clientHeight
+  const containerScrollHeight = container.scrollHeight
+  const buttonTop = currentButton.offsetTop
+  const buttonHeight = currentButton.offsetHeight
+  
+  // 计算滚动位置，让当前选集出现在容器的中间偏上位置（约30%处）
+  const targetPosition = buttonTop + (buttonHeight / 2) - (containerHeight * 0.3)
+  
+  // 确保滚动位置在有效范围内
+  const maxScrollTop = containerScrollHeight - containerHeight
+  const targetScrollTop = Math.max(0, Math.min(targetPosition, maxScrollTop))
+  
+  // 只有当需要滚动的距离超过一定阈值时才执行滚动
+  const currentScrollTop = container.scrollTop
+  const scrollDistance = Math.abs(targetScrollTop - currentScrollTop)
+  
+  if (scrollDistance > 50) { // 滚动距离超过50px才执行
+    container.scrollTo({
+      top: targetScrollTop,
+      behavior: 'smooth'
+    })
+    console.log(`自动滚动到当前选集: 第${props.currentEpisodeIndex + 1}集，滚动距离: ${scrollDistance}px`)
+  } else {
+    console.log(`当前选集已在可视区域中心，无需滚动: 第${props.currentEpisodeIndex + 1}集`)
+  }
+}
+
+// 切换选集弹窗显示状态
+const toggleEpisodeDialog = async () => {
+  showEpisodeDialog.value = !showEpisodeDialog.value
+  console.log('选集弹窗:', showEpisodeDialog.value ? '显示' : '隐藏')
+  
+  // 如果弹窗打开，等待弹窗动画完成后再滚动
+  if (showEpisodeDialog.value) {
+    // 延迟350ms，等待弹窗动画完成（CSS动画时长为300ms）
+    setTimeout(async () => {
+      await scrollToCurrentEpisode()
+    }, 350)
+  }
+}
+
+// 关闭选集弹窗
+const closeEpisodeDialog = () => {
+  showEpisodeDialog.value = false
+}
+
+// 选择剧集
+const selectEpisode = (episode) => {
+  console.log('选择剧集:', episode)
+  
+  // 关闭弹窗
+  closeEpisodeDialog()
+  
+  // 发送选集事件给父组件
+  emit('episode-selected', episode)
 }
 
 // 监听视频URL变化
@@ -928,5 +1038,143 @@ onUnmounted(() => {
 
 .btn-cancel:hover {
   background: #555;
+}
+
+/* 选集弹窗样式 */
+.episode-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.episode-dialog-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.episode-dialog-content {
+  position: relative;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  max-width: 600px;
+  max-height: 80vh;
+  width: 90%;
+  overflow: hidden;
+  animation: episodeDialogShow 0.3s ease-out;
+}
+
+@keyframes episodeDialogShow {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.episode-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e8e8e8;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.episode-dialog-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.episode-close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.episode-close-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #333;
+}
+
+.episode-list {
+  padding: 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.episode-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border: 2px solid #e8e8e8;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  min-height: 60px;
+}
+
+.episode-item:hover {
+  border-color: #23ade5;
+  background: #f8fcff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(35, 173, 229, 0.2);
+}
+
+.episode-item.current {
+  border-color: #23ade5;
+  background: linear-gradient(135deg, #23ade5 0%, #1e90ff 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(35, 173, 229, 0.3);
+}
+
+.episode-item.current:hover {
+  background: linear-gradient(135deg, #1e90ff 0%, #23ade5 100%);
+}
+
+.episode-number {
+  font-size: 16px;
+  font-weight: bold;
+  margin-right: 12px;
+  min-width: 24px;
+  text-align: center;
+}
+
+.episode-name {
+  font-size: 14px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
