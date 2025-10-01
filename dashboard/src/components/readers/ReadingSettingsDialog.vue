@@ -7,139 +7,142 @@
     @cancel="handleClose"
     class="reading-settings-dialog"
   >
-    <div class="settings-content">
-      <!-- 字体设置 -->
-      <div class="setting-section">
-        <div class="section-title">
-          <icon-font-colors />
-          <span>字体设置</span>
-        </div>
-        
-        <div class="setting-item">
-          <label class="setting-label">字体大小</label>
-          <div class="font-size-controls">
-            <a-button size="small" @click="adjustFontSize(-1)" :disabled="localSettings.fontSize <= 12">
-              <template #icon>
-                <icon-minus />
-              </template>
-            </a-button>
-            <span class="font-size-value">{{ localSettings.fontSize }}px</span>
-            <a-button size="small" @click="adjustFontSize(1)" :disabled="localSettings.fontSize >= 24">
-              <template #icon>
-                <icon-plus />
-              </template>
-            </a-button>
+    <div class="dialog-container">
+      <!-- 滚动内容区域 -->
+      <div class="settings-content">
+        <!-- 字体设置 -->
+        <div class="setting-section">
+          <div class="section-title">
+            <icon-font-colors />
+            <span>字体设置</span>
           </div>
-        </div>
-
-        <div class="setting-item">
-          <label class="setting-label">行间距</label>
-          <a-slider
-            v-model="localSettings.lineHeight"
-            :min="1.2"
-            :max="2.5"
-            :step="0.1"
-            :format-tooltip="(value) => `${value}`"
-            class="line-height-slider"
-          />
-        </div>
-
-        <div class="setting-item">
-          <label class="setting-label">字体族</label>
-          <a-select v-model="localSettings.fontFamily" class="font-family-select">
-            <a-option value="system-ui">系统默认</a-option>
-            <a-option value="'Microsoft YaHei', sans-serif">微软雅黑</a-option>
-            <a-option value="'SimSun', serif">宋体</a-option>
-            <a-option value="'KaiTi', serif">楷体</a-option>
-            <a-option value="'SimHei', sans-serif">黑体</a-option>
-            <a-option value="'Times New Roman', serif">Times New Roman</a-option>
-            <a-option value="'Arial', sans-serif">Arial</a-option>
-          </a-select>
-        </div>
-
-        <div class="setting-item">
-          <label class="setting-label">阅读宽度</label>
-          <a-slider
-            v-model="localSettings.maxWidth"
-            :min="600"
-            :max="1200"
-            :step="50"
-            :format-tooltip="(value) => `${value}px`"
-            class="max-width-slider"
-          />
-        </div>
-      </div>
-
-      <!-- 主题设置 -->
-      <div class="setting-section">
-        <div class="section-title">
-          <icon-palette />
-          <span>主题设置</span>
-        </div>
-        
-        <div class="theme-options">
-          <div
-            v-for="theme in themes"
-            :key="theme.key"
-            :class="[
-              'theme-option',
-              { 'active': localSettings.theme === theme.key }
-            ]"
-            @click="selectTheme(theme.key)"
-          >
-            <div class="theme-preview" :style="theme.style">
-              <div class="preview-text">Aa</div>
+          
+          <div class="setting-item">
+            <label class="setting-label">字体大小</label>
+            <div class="font-size-controls">
+              <a-button size="small" @click="adjustFontSize(-1)" :disabled="localSettings.fontSize <= 12">
+                <template #icon>
+                  <icon-minus />
+                </template>
+              </a-button>
+              <span class="font-size-value">{{ localSettings.fontSize }}px</span>
+              <a-button size="small" @click="adjustFontSize(1)" :disabled="localSettings.fontSize >= 24">
+                <template #icon>
+                  <icon-plus />
+                </template>
+              </a-button>
             </div>
-            <div class="theme-name">{{ theme.name }}</div>
           </div>
-        </div>
-      </div>
 
-      <!-- 自定义颜色 -->
-      <div class="setting-section" v-if="localSettings.theme === 'custom'">
-        <div class="section-title">
-          <icon-bg-colors />
-          <span>自定义颜色</span>
-        </div>
-        
-        <div class="color-settings">
-          <div class="color-item">
-            <label class="color-label">背景颜色</label>
-            <input
-              type="color"
-              v-model="localSettings.backgroundColor"
-              class="color-picker"
+          <div class="setting-item">
+            <label class="setting-label">行间距</label>
+            <a-slider
+              v-model="localSettings.lineHeight"
+              :min="1.2"
+              :max="2.5"
+              :step="0.1"
+              :format-tooltip="(value) => `${value}`"
+              class="line-height-slider"
             />
           </div>
-          <div class="color-item">
-            <label class="color-label">文字颜色</label>
-            <input
-              type="color"
-              v-model="localSettings.textColor"
-              class="color-picker"
+
+          <div class="setting-item">
+            <label class="setting-label">字体族</label>
+            <a-select v-model="localSettings.fontFamily" class="font-family-select">
+              <a-option value="system-ui">系统默认</a-option>
+              <a-option value="'Microsoft YaHei', sans-serif">微软雅黑</a-option>
+              <a-option value="'SimSun', serif">宋体</a-option>
+              <a-option value="'KaiTi', serif">楷体</a-option>
+              <a-option value="'SimHei', sans-serif">黑体</a-option>
+              <a-option value="'Times New Roman', serif">Times New Roman</a-option>
+              <a-option value="'Arial', sans-serif">Arial</a-option>
+            </a-select>
+          </div>
+
+          <div class="setting-item">
+            <label class="setting-label">阅读宽度</label>
+            <a-slider
+              v-model="localSettings.maxWidth"
+              :min="600"
+              :max="1200"
+              :step="50"
+              :format-tooltip="(value) => `${value}px`"
+              class="max-width-slider"
             />
+          </div>
+        </div>
+
+        <!-- 主题设置 -->
+        <div class="setting-section">
+          <div class="section-title">
+            <icon-palette />
+            <span>主题设置</span>
+          </div>
+          
+          <div class="theme-options">
+            <div
+              v-for="theme in themes"
+              :key="theme.key"
+              :class="[
+                'theme-option',
+                { 'active': localSettings.theme === theme.key }
+              ]"
+              @click="selectTheme(theme.key)"
+            >
+              <div class="theme-preview" :style="theme.style">
+                <div class="preview-text">Aa</div>
+              </div>
+              <div class="theme-name">{{ theme.name }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 自定义颜色 -->
+        <div class="setting-section" v-if="localSettings.theme === 'custom'">
+          <div class="section-title">
+            <icon-bg-colors />
+            <span>自定义颜色</span>
+          </div>
+          
+          <div class="color-settings">
+            <div class="color-item">
+              <label class="color-label">背景颜色</label>
+              <input
+                type="color"
+                v-model="localSettings.backgroundColor"
+                class="color-picker"
+              />
+            </div>
+            <div class="color-item">
+              <label class="color-label">文字颜色</label>
+              <input
+                type="color"
+                v-model="localSettings.textColor"
+                class="color-picker"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 预览区域 -->
+        <div class="setting-section">
+          <div class="section-title">
+            <icon-eye />
+            <span>预览效果</span>
+          </div>
+          
+          <div class="preview-area" :style="previewStyles">
+            <h3 class="preview-title">第一章 开始的地方</h3>
+            <p class="preview-text">
+              这是一段示例文字，用于预览当前的阅读设置效果。您可以调整上方的设置来获得最佳的阅读体验。
+              字体大小、行间距、字体族和颜色主题都会影响阅读的舒适度。
+            </p>
           </div>
         </div>
       </div>
 
-      <!-- 预览区域 -->
-      <div class="setting-section">
-        <div class="section-title">
-          <icon-eye />
-          <span>预览效果</span>
-        </div>
-        
-        <div class="preview-area" :style="previewStyles">
-          <h3 class="preview-title">第一章 开始的地方</h3>
-          <p class="preview-text">
-            这是一段示例文字，用于预览当前的阅读设置效果。您可以调整上方的设置来获得最佳的阅读体验。
-            字体大小、行间距、字体族和颜色主题都会影响阅读的舒适度。
-          </p>
-        </div>
-      </div>
-
-      <!-- 操作按钮 -->
-      <div class="dialog-actions">
+      <!-- 固定底部按钮 -->
+      <div class="dialog-footer">
         <a-button @click="resetSettings" class="reset-btn">
           重置默认
         </a-button>
@@ -219,6 +222,46 @@ const themes = [
     style: {
       backgroundColor: '#f4f1e8',
       color: '#5c4b37'
+    }
+  },
+  {
+    key: 'green',
+    name: '绿豆沙',
+    style: {
+      backgroundColor: '#c7edcc',
+      color: '#2d5016'
+    }
+  },
+  {
+    key: 'parchment',
+    name: '羊皮纸',
+    style: {
+      backgroundColor: '#fdf6e3',
+      color: '#657b83'
+    }
+  },
+  {
+    key: 'night',
+    name: '夜间护眼',
+    style: {
+      backgroundColor: '#2b2b2b',
+      color: '#c9aa71'
+    }
+  },
+  {
+    key: 'blue',
+    name: '蓝光护眼',
+    style: {
+      backgroundColor: '#e8f4f8',
+      color: '#1e3a5f'
+    }
+  },
+  {
+    key: 'pink',
+    name: '粉色护眼',
+    style: {
+      backgroundColor: '#fdf2f8',
+      color: '#831843'
     }
   },
   {
@@ -317,15 +360,42 @@ watch(dialogVisible, (visible) => {
 </script>
 
 <style scoped>
+/* 重写模态框样式，确保头部和底部固定 */
+.reading-settings-dialog :deep(.arco-modal) {
+  height: 60vh;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.reading-settings-dialog :deep(.arco-modal-header) {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border-2);
+}
+
 .reading-settings-dialog :deep(.arco-modal-body) {
   padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dialog-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 .settings-content {
+  flex: 1;
   padding: 20px;
-  max-height: 70vh;
   overflow-y: auto;
+  overflow-x: hidden;
 }
+
+
 
 .setting-section {
   margin-bottom: 24px;
@@ -471,13 +541,14 @@ watch(dialogVisible, (visible) => {
   text-indent: 2em;
 }
 
-.dialog-actions {
+.dialog-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 24px;
-  padding-top: 16px;
+  padding: 16px 20px;
   border-top: 1px solid var(--color-border-2);
+  background: var(--color-bg-1);
+  flex-shrink: 0;
 }
 
 .action-buttons {
@@ -515,7 +586,7 @@ watch(dialogVisible, (visible) => {
     justify-content: center;
   }
   
-  .dialog-actions {
+  .dialog-footer {
     flex-direction: column;
     gap: 12px;
   }

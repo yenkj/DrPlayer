@@ -304,10 +304,17 @@ onUnmounted(() => {
   color: var(--color-text-4);
 }
 
-/* 章节下拉菜单样式 */
+/* 章节下拉菜单样式 - 使用更强的选择器覆盖Arco Design默认样式 */
+:deep(.arco-dropdown-content) {
+  max-height: calc(100vh - 120px) !important;
+  padding: 0 !important;
+}
+
 .chapter-dropdown {
   width: 300px;
-  max-height: 70vh; /* 使用视口高度的70% */
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
 }
 
 .chapter-dropdown-header {
@@ -318,6 +325,8 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--color-border-2);
   font-weight: 500;
   color: var(--color-text-1);
+  flex-shrink: 0;
+  background: var(--color-bg-1);
 }
 
 .total-count {
@@ -327,7 +336,8 @@ onUnmounted(() => {
 }
 
 .chapter-dropdown-content {
-  max-height: calc(70vh - 60px); /* 减去头部高度 */
+  flex: 1;
+  max-height: calc(100vh - 180px);
   overflow-y: auto;
   /* 优化滚动条样式 */
   scrollbar-width: thin;
