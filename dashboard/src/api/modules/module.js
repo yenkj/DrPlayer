@@ -173,16 +173,22 @@ export const getVideoDetail = async (module, params) => {
  * @param {string} module - 模块名称
  * @param {object} params - 播放参数
  * @param {string} params.play - 播放地址或ID
+ * @param {string} params.flag - 源标识（线路名称）
  * @param {string|object} params.extend - 接口数据扩展参数（对象类型会自动转换为JSON字符串）
  * @param {string} params.apiUrl - 可选的直接API地址
  * @returns {Promise} 播放数据
  */
 export const getPlayData = async (module, params) => {
-  const { play, extend, apiUrl } = params
+  const { play, flag, extend, apiUrl } = params
   
   const requestParams = {
     ac: MODULE_ACTIONS.PLAY,
     play
+  }
+  
+  // 添加flag参数支持
+  if (flag) {
+    requestParams.flag = flag
   }
   
   const processedExtend = processExtendParam(extend)
@@ -197,6 +203,83 @@ export const getPlayData = async (module, params) => {
   
   // 否则使用原来的代理方式
   return get(buildModuleUrl(module), requestParams)
+}
+
+/**
+ * 播放解析接口 - 专门用于选集播放解析
+ * @param {string} module - 模块名称
+ * @param {object} params - 播放参数
+ * @param {string} params.play - 播放地址或ID（选集链接）
+ * @param {string} params.flag - 源标识（线路名称）
+ * @param {string|object} params.extend - 接口数据扩展参数
+ * @param {string} params.apiUrl - 可选的直接API地址
+ * @returns {Promise} 播放解析结果
+ */
+export const parsePlayUrl = async (module, params) => {
+  try {
+    console.log('T4播放解析请求:', { module, params })
+    
+    const playData = await getPlayData(module, params)
+    console.log('T4播放解析响应:', playData)
+    
+    // 处理解析结果
+    const result = {
+      success: true,
+      data: playData,
+      // 解析播放类型
+      playType: 'direct', // 默认直链
+      url: '',
+      needParse: false,
+      needSniff: false,
+      message: ''
+    }
+    
+    // 检查返回数据格式
+    if (playData && typeof playData === 'object') {
+      // 检查parse字段
+      if (playData.parse === 0) {
+        // 直链播放
+        result.playType = 'direct'
+        result.url = playData.url || playData.play_url || ''
+        result.needParse = false
+        result.needSniff = false
+        result.message = '直链播放'
+      } else if (playData.parse === 1) {
+        // 需要嗅探
+        result.playType = 'sniff'
+        result.url = playData.url || playData.play_url || ''
+        result.needSniff = true
+        result.message = '需要嗅探才能播放，尽情期待'
+      } else if (playData.jx === 1) {
+        // 需要解析
+        result.playType = 'parse'
+        result.url = playData.url || playData.play_url || ''
+        result.needParse = true
+        result.message = '需要解析才能播放，尽情期待'
+      } else {
+        // 默认处理为直链
+        result.url = playData.url || playData.play_url || playData
+        result.message = '直链播放'
+      }
+    } else if (typeof playData === 'string') {
+      // 如果返回的是字符串，直接作为播放地址
+      result.url = playData
+      result.message = '直链播放'
+    }
+    
+    return result
+  } catch (error) {
+    console.error('T4播放解析失败:', error)
+    return {
+      success: false,
+      error: error.message || '播放解析失败',
+      playType: 'error',
+      url: '',
+      needParse: false,
+      needSniff: false,
+      message: '播放解析失败: ' + (error.message || '未知错误')
+    }
+  }
 }
 
 /**
@@ -350,6 +433,7 @@ export default {
   getCategoryData,
   getVideoDetail,
   getPlayData,
+  parsePlayUrl,
   searchVideos,
   executeAction,
   refreshModule,
