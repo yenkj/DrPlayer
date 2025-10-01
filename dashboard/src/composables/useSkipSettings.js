@@ -28,9 +28,13 @@ export function useSkipSettings(options = {}) {
   const skipOutroTimer = ref(null)
   const lastSkipTime = ref(0) // 记录上次跳过的时间戳，用于防抖
   
-  // 用户交互状态
-  const userSeeking = ref(false) // 用户是否正在拖动进度条
-  const lastUserSeekTime = ref(0) // 上次用户拖动的时间戳
+  //// 用户交互状态
+  const userSeeking = ref(false)
+  const lastUserSeekTime = ref(0)
+  
+  // 全屏状态跟踪
+  const isFullscreenChanging = ref(false)
+  const lastFullscreenChangeTime = ref(0) // 上次用户拖动的时间戳
 
   // 计算属性
   const skipEnabled = computed(() => {
@@ -119,6 +123,18 @@ export function useSkipSettings(options = {}) {
       return
     }
     
+    // 检查是否正在全屏切换或刚刚切换过（2秒内）
+    if (isFullscreenChanging.value || (lastFullscreenChangeTime.value > 0 && now - lastFullscreenChangeTime.value < 2000)) {
+      console.log('正在全屏切换或刚刚切换过，跳过自动片头跳过')
+      return
+    }
+    
+    // 检查是否正在全屏切换或刚刚切换过（2秒内）
+    if (isFullscreenChanging.value || (lastFullscreenChangeTime.value > 0 && now - lastFullscreenChangeTime.value < 2000)) {
+      console.log('正在全屏切换或刚刚切换过，跳过自动片头跳过')
+      return
+    }
+    
     // 立即跳过模式：如果当前时间很小（小于等于1秒）且在片头跳过范围内，立即跳过
     if (currentTime <= 1 && currentTime <= skipIntroSeconds.value) {
       console.log(`立即跳过片头：从 ${currentTime} 秒跳转到 ${skipIntroSeconds.value} 秒`)
@@ -160,6 +176,12 @@ export function useSkipSettings(options = {}) {
     // 检查用户是否正在拖动或刚刚拖动过（3秒内）
     if (userSeeking.value || (lastUserSeekTime.value > 0 && now - lastUserSeekTime.value < 3000)) {
       console.log('用户正在拖动进度条或刚刚拖动过，跳过自动片头跳过')
+      return
+    }
+    
+    // 检查是否正在全屏切换或刚刚切换过（2秒内）
+    if (isFullscreenChanging.value || (lastFullscreenChangeTime.value > 0 && now - lastFullscreenChangeTime.value < 2000)) {
+      console.log('正在全屏切换或刚刚切换过，跳过自动片头跳过')
       return
     }
     
@@ -252,6 +274,10 @@ export function useSkipSettings(options = {}) {
     userSeeking.value = false
     lastUserSeekTime.value = 0
     
+    // 重置全屏状态
+    isFullscreenChanging.value = false
+    lastFullscreenChangeTime.value = 0
+    
     // 清除片尾跳过定时器（如果存在）
     if (skipOutroTimer.value) {
       clearTimeout(skipOutroTimer.value)
@@ -260,7 +286,7 @@ export function useSkipSettings(options = {}) {
   }
 
   /**
-   * 标记用户开始拖动进度条
+   * 用户开始拖动进度条
    */
   const onUserSeekStart = () => {
     userSeeking.value = true
@@ -268,12 +294,29 @@ export function useSkipSettings(options = {}) {
   }
 
   /**
-   * 标记用户结束拖动进度条
+   * 用户结束拖动进度条
    */
   const onUserSeekEnd = () => {
     userSeeking.value = false
     lastUserSeekTime.value = Date.now()
     console.log('用户结束拖动进度条')
+  }
+
+  /**
+   * 全屏状态开始变化
+   */
+  const onFullscreenChangeStart = () => {
+    isFullscreenChanging.value = true
+    console.log('全屏状态开始变化')
+  }
+
+  /**
+   * 全屏状态变化结束
+   */
+  const onFullscreenChangeEnd = () => {
+    isFullscreenChanging.value = false
+    lastFullscreenChangeTime.value = Date.now()
+    console.log('全屏状态变化结束')
   }
 
   /**
@@ -338,6 +381,8 @@ export function useSkipSettings(options = {}) {
     closeSkipSettingsDialog,
     cleanup,
     onUserSeekStart,
-    onUserSeekEnd
+    onUserSeekEnd,
+    onFullscreenChangeStart,
+    onFullscreenChangeEnd
   }
 }

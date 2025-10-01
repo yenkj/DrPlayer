@@ -81,6 +81,9 @@ import { Message } from '@arco-design/web-vue'
 import { IconClose } from '@arco-design/web-vue/es/icon'
 import Artplayer from 'artplayer'
 import Hls from 'hls.js'
+
+// 配置自定义倍速选项
+Artplayer.PLAYBACK_RATE = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5]
 import PlayerHeader from './PlayerHeader.vue'
 import SkipSettingsDialog from './SkipSettingsDialog.vue'
 import { useSkipSettings } from '@/composables/useSkipSettings'
@@ -161,7 +164,9 @@ const {
   closeSkipSettingsDialog,
   saveSkipSettings: saveSkipSettingsComposable,
   onUserSeekStart,
-  onUserSeekEnd
+  onUserSeekEnd,
+  onFullscreenChangeStart,
+  onFullscreenChangeEnd
 } = useSkipSettings({
   onSkipToNext: () => {
     if (autoNextEnabled.value && hasNextEpisode()) {
@@ -611,6 +616,14 @@ const initArtPlayer = async (url) => {
     // 监听全屏状态变化
     art.on('fullscreen', (isFullscreen) => {
       console.log('全屏状态变化:', isFullscreen)
+      
+      // 标记全屏状态开始变化
+      onFullscreenChangeStart()
+      
+      // 500ms后标记全屏状态变化结束
+      setTimeout(() => {
+        onFullscreenChangeEnd()
+      }, 500)
     })
 
     art.on('video:error', (err) => {

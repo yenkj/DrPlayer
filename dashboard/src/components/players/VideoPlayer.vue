@@ -26,6 +26,28 @@
         您的浏览器不支持视频播放
       </video>
       
+      <!-- 倍速控制器 -->
+      <div class="speed-control">
+        <label for="speed-select">倍速：</label>
+        <select 
+          id="speed-select" 
+          v-model="currentSpeed" 
+          @change="changePlaybackRate"
+          class="speed-selector"
+        >
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1">1x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2x</option>
+          <option value="2.5">2.5x</option>
+          <option value="3">3x</option>
+          <option value="4">4x</option>
+          <option value="5">5x</option>
+        </select>
+      </div>
+      
       <!-- 自动下一集倒计时弹窗 -->
       <div v-if="showAutoNextDialog" class="auto-next-dialog">
         <div class="auto-next-content">
@@ -113,6 +135,7 @@ const showAutoNextDialog = ref(false)
 const autoNextCountdown = ref(10)
 const countdownTimer = ref(null)
 const isProcessingAutoNext = ref(false) // 防止重复触发自动连播
+const currentSpeed = ref(1) // 当前播放倍速
 
 // 检查是否有下一集
 const hasNextEpisode = () => {
@@ -206,6 +229,14 @@ const cancelAutoNext = () => {
   hideAutoNextDialog()
   // 重置防抖标志
   isProcessingAutoNext.value = false
+}
+
+// 改变播放倍速
+const changePlaybackRate = () => {
+  if (videoPlayer.value) {
+    videoPlayer.value.playbackRate = parseFloat(currentSpeed.value)
+    console.log('播放倍速已设置为:', currentSpeed.value)
+  }
 }
 
 // 链接类型判断函数
@@ -746,6 +777,47 @@ onUnmounted(() => {
 
 .btn-cancel:hover {
   background: #555;
+}
+
+/* 倍速控制器样式 */
+.speed-control {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 12px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+}
+
+.speed-control label {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.speed-selector {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.speed-selector:hover {
+  background: white;
+  border-color: #23ade5;
+}
+
+.speed-selector:focus {
+  border-color: #23ade5;
+  box-shadow: 0 0 0 2px rgba(35, 173, 229, 0.2);
 }
 
 
