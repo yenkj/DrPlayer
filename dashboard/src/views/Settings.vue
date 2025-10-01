@@ -304,6 +304,17 @@
                     @select="(value) => addressSettings.proxySniff = value"
                   />
                   <a-button 
+                    type="outline" 
+                    @click="resetProxySniff"
+                    :loading="addressSaving.proxySniffReset"
+                    size="medium"
+                  >
+                    <template #icon>
+                      <icon-refresh />
+                    </template>
+                    重置
+                  </a-button>
+                  <a-button 
                     type="primary" 
                     @click="saveAddress('proxySniff')"
                     :loading="addressSaving.proxySniff"
@@ -760,7 +771,7 @@ const addressSettings = reactive({
   proxyAccessEnabled: false,
   proxyPlay: '',
   proxyPlayEnabled: false,
-  proxySniff: '',
+  proxySniff: 'http://localhost:57573/sniffer',
   proxySniffEnabled: false
 })
 
@@ -770,7 +781,8 @@ const addressSaving = reactive({
   liveConfigReset: false,
   proxyAccess: false,
   proxyPlay: false,
-  proxySniff: false
+  proxySniff: false,
+  proxySniffReset: false
 })
 
 const addressTesting = reactive({
@@ -992,6 +1004,41 @@ const resetLiveConfig = async () => {
   }
 }
 
+// 重置代理嗅探接口
+const resetProxySniff = async () => {
+  addressSaving.proxySniffReset = true
+  try {
+    // 重置为默认值
+    addressSettings.proxySniff = 'http://localhost:57573/sniffer'
+    addressSettings.proxySniffEnabled = false
+    
+    // 保存到本地存储
+    const savedAddresses = JSON.parse(localStorage.getItem('addressSettings') || '{}')
+    savedAddresses.proxySniff = addressSettings.proxySniff
+    savedAddresses.proxySniffEnabled = addressSettings.proxySniffEnabled
+    localStorage.setItem('addressSettings', JSON.stringify(savedAddresses))
+    
+    addressStatus.proxySniff = {
+      type: 'success',
+      message: '代理嗅探接口已重置为默认地址'
+    }
+    Message.success('代理嗅探接口重置成功')
+  } catch (error) {
+    console.error('重置代理嗅探接口失败:', error)
+    addressStatus.proxySniff = {
+      type: 'error',
+      message: '重置失败：' + (error.message || '未知错误')
+    }
+    Message.error('重置失败：' + (error.message || '未知错误'))
+  } finally {
+    addressSaving.proxySniffReset = false
+    // 8秒后清除状态消息
+    setTimeout(() => {
+      addressStatus.proxySniff = null
+    }, 8000)
+  }
+}
+
 // 获取配置键名
 const getConfigKey = (configType) => {
   const keyMap = {
@@ -1064,6 +1111,51 @@ const handlePlayerSelect = (playerType) => {
   Message.success(`已切换到 ${getCurrentPlayerName()}`)
 }
 
+// 重置所有设置到默认状态
+const resetAllSettings = () => {
+  // 重置地址设置
+  Object.assign(addressSettings, {
+    vodConfig: '',
+    liveConfig: '',
+    proxyAccess: '',
+    proxyAccessEnabled: false,
+    proxyPlay: '',
+    proxyPlayEnabled: false,
+    proxySniff: 'http://localhost:57573/sniffer',
+    proxySniffEnabled: false
+  })
+  
+  // 重置其他设置
+  Object.assign(settings, {
+    datasourceDisplay: true,
+    windowPreview: true,
+    playerType: 'ijk',
+    adFilter: true,
+    ijkCache: false,
+    autoLive: false,
+    secureDns: false,
+    cspBypass: true,
+    referrerPolicy: 'no-referrer'
+  })
+  
+  // 清除本地存储
+  localStorage.removeItem('addressSettings')
+  localStorage.removeItem('appSettings')
+  
+  // 重置CSP配置
+  try {
+    saveCSPConfig({
+      enabled: true,
+      referrerPolicy: 'no-referrer'
+    })
+    setGlobalReferrerPolicy('no-referrer')
+  } catch (error) {
+    console.error('Failed to reset CSP config:', error)
+  }
+  
+  Message.success('所有设置已重置为默认状态')
+}
+
 // 处理设置项点击
 const handleSettingClick = (settingKey) => {
   console.log('Setting clicked:', settingKey)
@@ -1093,6 +1185,9 @@ const handleSettingClick = (settingKey) => {
     case 'referrer-policy':
       handleReferrerPolicySelect()
       break
+    case 'reset':
+      resetAllSettings()
+      break
     default:
       Message.info(`点击了设置项：${settingKey}`)
       break
@@ -1108,6 +1203,10 @@ const loadConfig = async () => {
       try {
         const parsed = JSON.parse(savedAddresses)
         Object.assign(addressSettings, parsed)
+        // 确保代理嗅探接口有默认值
+        if (!addressSettings.proxySniff) {
+          addressSettings.proxySniff = 'http://localhost:57573/sniffer'
+        }
       } catch (error) {
         console.error('Failed to load address settings:', error)
       }
