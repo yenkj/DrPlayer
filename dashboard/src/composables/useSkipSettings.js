@@ -3,7 +3,7 @@ import { ref, computed, onUnmounted } from 'vue'
 /**
  * 片头片尾跳过功能的组合式函数
  * @param {Object} options - 配置选项
- * @param {Function} options.onSkipToNext - 跳转到下一集的回调函数
+ * @param {Function} options.onSkipToNext - 跳转到下一集的回调函数（仅用于片尾跳过到下一集的场景）
  * @param {Function} options.getCurrentTime - 获取当前播放时间的函数
  * @param {Function} options.setCurrentTime - 设置播放时间的函数
  * @param {Function} options.getDuration - 获取视频总时长的函数
@@ -24,7 +24,13 @@ export function useSkipSettings(options = {}) {
   const skipIntroSeconds = ref(90)
   const skipOutroSeconds = ref(90)
   const skipIntroApplied = ref(false)
+  const skipOutroApplied = ref(false)
   const skipOutroTimer = ref(null)
+  const lastSkipTime = ref(0) // 记录上次跳过的时间戳，用于防抖
+  
+  // 用户交互状态
+  const userSeeking = ref(false) // 用户是否正在拖动进度条
+  const lastUserSeekTime = ref(0) // 上次用户拖动的时间戳
 
   // 计算属性
   const skipEnabled = computed(() => {
@@ -40,12 +46,21 @@ export function useSkipSettings(options = {}) {
   const loadSkipSettings = () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
+      console.log('从 localStorage 加载设置:', saved)
       if (saved) {
         const settings = JSON.parse(saved)
         skipIntroEnabled.value = settings.skipIntroEnabled || false
         skipOutroEnabled.value = settings.skipOutroEnabled || false
         skipIntroSeconds.value = settings.skipIntroSeconds || 90
         skipOutroSeconds.value = settings.skipOutroSeconds || 90
+        console.log('加载的设置:', {
+          skipIntroEnabled: skipIntroEnabled.value,
+          skipOutroEnabled: skipOutroEnabled.value,
+          skipIntroSeconds: skipIntroSeconds.value,
+          skipOutroSeconds: skipOutroSeconds.value
+        })
+      } else {
+        console.log('没有找到保存的设置，使用默认值')
       }
     } catch (error) {
       console.warn('加载片头片尾设置失败:', error)
@@ -80,36 +95,117 @@ export function useSkipSettings(options = {}) {
   }
 
   /**
-   * 应用片头跳过设置
+   * 立即应用片头跳过逻辑（用于视频刚开始播放时）
    */
-  const applyIntroSkip = () => {
-    if (!skipIntroEnabled.value || skipIntroApplied.value) return
+  const applyIntroSkipImmediate = () => {
+    console.log('applyIntroSkipImmediate 被调用')
+    
+    if (!skipIntroEnabled.value) {
+      console.log('片头跳过未启用')
+      return
+    }
+    
+    if (skipIntroApplied.value) {
+      console.log('片头跳过已应用，跳过')
+      return
+    }
 
     const currentTime = getCurrentTime()
-    if (currentTime < skipIntroSeconds.value) {
+    const now = Date.now()
+    
+    // 检查用户是否正在拖动或刚刚拖动过（3秒内）
+    if (userSeeking.value || (lastUserSeekTime.value > 0 && now - lastUserSeekTime.value < 3000)) {
+      console.log('用户正在拖动进度条或刚刚拖动过，跳过自动片头跳过')
+      return
+    }
+    
+    // 立即跳过模式：如果当前时间很小（小于等于1秒）且在片头跳过范围内，立即跳过
+    if (currentTime <= 1 && currentTime <= skipIntroSeconds.value) {
+      console.log(`立即跳过片头：从 ${currentTime} 秒跳转到 ${skipIntroSeconds.value} 秒`)
       setCurrentTime(skipIntroSeconds.value)
       skipIntroApplied.value = true
+      lastSkipTime.value = now
+      console.log(`已立即跳过片头 ${skipIntroSeconds.value} 秒`)
+      return true // 返回 true 表示已执行跳过
+    }
+    
+    return false // 返回 false 表示未执行跳过
+  }
+
+  /**
+   * 应用片头跳过逻辑
+   */
+  const applyIntroSkip = () => {
+    console.log('applyIntroSkip 被调用', {
+      skipIntroEnabled: skipIntroEnabled.value,
+      skipIntroApplied: skipIntroApplied.value,
+      currentTime: getCurrentTime(),
+      skipIntroSeconds: skipIntroSeconds.value,
+      userSeeking: userSeeking.value
+    })
+    
+    if (!skipIntroEnabled.value) {
+      console.log('片头跳过未启用')
+      return
+    }
+    
+    if (skipIntroApplied.value) {
+      console.log('片头跳过已应用，跳过')
+      return
+    }
+
+    const currentTime = getCurrentTime()
+    const now = Date.now()
+    
+    // 检查用户是否正在拖动或刚刚拖动过（3秒内）
+    if (userSeeking.value || (lastUserSeekTime.value > 0 && now - lastUserSeekTime.value < 3000)) {
+      console.log('用户正在拖动进度条或刚刚拖动过，跳过自动片头跳过')
+      return
+    }
+    
+    // 防抖：如果距离上次跳过不足1秒，则忽略（但如果是新视频，lastSkipTime为0，允许跳过）
+    // 减少防抖时间，提高响应速度
+    if (lastSkipTime.value > 0 && now - lastSkipTime.value < 1000) {
+      console.log('防抖限制，跳过')
+      return
+    }
+    
+    // 如果当前时间在片头跳过范围内，则跳过
+    if (currentTime <= skipIntroSeconds.value) {
+      console.log(`准备跳过片头：从 ${currentTime} 秒跳转到 ${skipIntroSeconds.value} 秒`)
+      setCurrentTime(skipIntroSeconds.value)
+      skipIntroApplied.value = true
+      lastSkipTime.value = now
       console.log(`已跳过片头 ${skipIntroSeconds.value} 秒`)
+    } else {
+      console.log(`当前时间 ${currentTime} 秒已超过片头跳过范围 ${skipIntroSeconds.value} 秒`)
     }
   }
 
   /**
-   * 设置片尾跳过逻辑
+   * 应用片尾跳过逻辑
    */
-  const setupOutroSkip = () => {
-    if (!skipOutroEnabled.value) return
+  const applyOutroSkip = () => {
+    if (!skipOutroEnabled.value || skipOutroApplied.value) return
 
     const duration = getDuration()
     if (duration <= 0) return
 
     const currentTime = getCurrentTime()
     const timeToSkip = duration - skipOutroSeconds.value
+    const now = Date.now()
+    
+    // 防抖：如果距离上次跳过不足2秒，则忽略
+    if (now - lastSkipTime.value < 2000) {
+      return
+    }
 
-    if (currentTime >= timeToSkip && !skipOutroTimer.value) {
-      skipOutroTimer.value = setTimeout(() => {
-        console.log(`已跳过片尾 ${skipOutroSeconds.value} 秒，跳转到下一集`)
-        onSkipToNext()
-      }, 1000) // 延迟1秒执行，避免频繁触发
+    // 当播放时间达到片尾跳过点时，直接跳转到视频结束位置
+    if (currentTime >= timeToSkip && currentTime < duration - 1) {
+      setCurrentTime(duration - 0.1) // 跳转到接近结束的位置，触发 ended 事件
+      skipOutroApplied.value = true
+      lastSkipTime.value = now
+      console.log(`已跳过片尾 ${skipOutroSeconds.value} 秒，跳转到视频结束位置`)
     }
   }
 
@@ -117,11 +213,16 @@ export function useSkipSettings(options = {}) {
    * 应用片头片尾设置
    */
   const applySkipSettings = () => {
-    // 应用片头跳过
-    applyIntroSkip()
+    // 优先尝试立即片头跳过（用于视频刚开始播放时）
+    const immediateSkipped = applyIntroSkipImmediate()
     
-    // 设置片尾跳过
-    setupOutroSkip()
+    // 如果立即跳过未执行，则使用常规片头跳过
+    if (!immediateSkipped) {
+      applyIntroSkip()
+    }
+    
+    // 应用片尾跳过
+    applyOutroSkip()
   }
 
   /**
@@ -133,21 +234,9 @@ export function useSkipSettings(options = {}) {
       applyIntroSkip()
     }
 
-    // 处理片尾跳过
-    if (skipOutroEnabled.value) {
-      const duration = getDuration()
-      const currentTime = getCurrentTime()
-      
-      if (duration > 0) {
-        const timeToSkip = duration - skipOutroSeconds.value
-        
-        if (currentTime >= timeToSkip && !skipOutroTimer.value) {
-          skipOutroTimer.value = setTimeout(() => {
-            console.log(`已跳过片尾 ${skipOutroSeconds.value} 秒，跳转到下一集`)
-            onSkipToNext()
-          }, 1000)
-        }
-      }
+    // 应用片尾跳过（仅在未应用时）
+    if (skipOutroEnabled.value && !skipOutroApplied.value) {
+      applyOutroSkip()
     }
   }
 
@@ -156,10 +245,35 @@ export function useSkipSettings(options = {}) {
    */
   const resetSkipState = () => {
     skipIntroApplied.value = false
+    skipOutroApplied.value = false
+    lastSkipTime.value = 0 // 重置防抖时间戳
+    
+    // 重置用户交互状态
+    userSeeking.value = false
+    lastUserSeekTime.value = 0
+    
+    // 清除片尾跳过定时器（如果存在）
     if (skipOutroTimer.value) {
       clearTimeout(skipOutroTimer.value)
       skipOutroTimer.value = null
     }
+  }
+
+  /**
+   * 标记用户开始拖动进度条
+   */
+  const onUserSeekStart = () => {
+    userSeeking.value = true
+    console.log('用户开始拖动进度条')
+  }
+
+  /**
+   * 标记用户结束拖动进度条
+   */
+  const onUserSeekEnd = () => {
+    userSeeking.value = false
+    lastUserSeekTime.value = Date.now()
+    console.log('用户结束拖动进度条')
   }
 
   /**
@@ -216,11 +330,14 @@ export function useSkipSettings(options = {}) {
     loadSkipSettings,
     saveSkipSettings,
     applySkipSettings,
+    applyIntroSkipImmediate,
     handleTimeUpdate,
     resetSkipState,
     initSkipSettings,
     openSkipSettingsDialog,
     closeSkipSettingsDialog,
-    cleanup
+    cleanup,
+    onUserSeekStart,
+    onUserSeekEnd
   }
 }

@@ -403,12 +403,23 @@ const initVideoPlayer = (url) => {
     
     const handleLoadStart = () => {
       console.log('开始加载视频')
+      // 重置片头片尾跳过状态
+      resetSkipState()
+    }
+    
+    const handlePlaying = () => {
+      console.log('视频开始播放')
+      // 延迟一点应用跳过设置，确保视频已经开始播放
+      setTimeout(() => {
+        applySkipSettings()
+      }, 100)
     }
     
     // 移除之前的事件监听器（如果有）
     video.removeEventListener('loadedmetadata', handleLoadedMetadata)
     video.removeEventListener('error', handleError)
     video.removeEventListener('loadstart', handleLoadStart)
+    video.removeEventListener('playing', handlePlaying)
     video.removeEventListener('timeupdate', handleTimeUpdate)
     video.removeEventListener('ended', handleVideoEnded)
     
@@ -416,6 +427,7 @@ const initVideoPlayer = (url) => {
     video.addEventListener('loadedmetadata', handleLoadedMetadata)
     video.addEventListener('error', handleError)
     video.addEventListener('loadstart', handleLoadStart)
+    video.addEventListener('playing', handlePlaying)
     video.addEventListener('timeupdate', handleTimeUpdate)
     video.addEventListener('ended', handleVideoEnded)
     
@@ -473,6 +485,7 @@ const handlePlayerTypeChange = (newType) => {
 // 监听视频URL变化
 watch(() => props.videoUrl, (newUrl) => {
   if (newUrl && props.visible) {
+    resetSkipState() // 重置片头片尾跳过状态
     nextTick(() => {
       initVideoPlayer(newUrl)
     })

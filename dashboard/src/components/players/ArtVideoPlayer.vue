@@ -156,9 +156,12 @@ const {
   initSkipSettings,
   resetSkipState,
   applySkipSettings,
+  applyIntroSkipImmediate,
   handleTimeUpdate,
   closeSkipSettingsDialog,
-  saveSkipSettings: saveSkipSettingsComposable
+  saveSkipSettings: saveSkipSettingsComposable,
+  onUserSeekStart,
+  onUserSeekEnd
 } = useSkipSettings({
   onSkipToNext: () => {
     if (autoNextEnabled.value && hasNextEpisode()) {
@@ -247,16 +250,38 @@ const initArtPlayer = async (url) => {
     return
   }
   
-  // 清理之前的播放器实例
+  // 如果播放器实例已存在，使用 switchUrl 方法切换视频源
   if (artPlayerInstance.value) {
-    // 清理 HLS 实例
-    if (artPlayerInstance.value.hls) {
-      artPlayerInstance.value.hls.destroy()
-      artPlayerInstance.value.hls = null
-    }
+    console.log('使用 switchUrl 方法切换视频源:', url)
     
-    artPlayerInstance.value.destroy()
-    artPlayerInstance.value = null
+    try {
+      // 使用 switchUrl 方法切换视频源，这样可以保持全屏状态和其他用户设置
+      await artPlayerInstance.value.switchUrl(url)
+      console.log('视频源切换成功')
+      
+      // 重新应用片头片尾设置
+      applySkipSettings()
+      
+      return // 切换成功，直接返回
+    } catch (error) {
+      console.error('switchUrl 切换失败，回退到销毁重建方式:', error)
+      // 如果 switchUrl 失败，回退到原来的销毁重建方式
+      
+      // 清理缓冲区清理定时器
+      if (artPlayerInstance.value.bufferCleanupInterval) {
+        clearInterval(artPlayerInstance.value.bufferCleanupInterval)
+        artPlayerInstance.value.bufferCleanupInterval = null
+      }
+      
+      // 清理 HLS 实例
+      if (artPlayerInstance.value.hls) {
+        artPlayerInstance.value.hls.destroy()
+        artPlayerInstance.value.hls = null
+      }
+      
+      artPlayerInstance.value.destroy()
+      artPlayerInstance.value = null
+    }
   }
   
   try {
@@ -307,8 +332,42 @@ const initArtPlayer = async (url) => {
             const hls = new Hls({
               // HLS 配置选项
               enableWorker: true,
-              lowLatencyMode: true,
-              backBufferLength: 90,
+              lowLatencyMode: false, // 关闭低延迟模式，提高稳定性
+              
+              // 缓冲区配置 - 关键优化
+              backBufferLength: 15, // 减少后缓冲长度，避免内存占用过多
+              maxBufferLength: 30,  // 减少最大缓冲长度到30秒，避免内存问题
+              maxBufferSize: 30 * 1000 * 1000, // 减少最大缓冲大小到30MB
+              maxBufferHole: 0.3,   // 减少最大缓冲空洞到0.3秒
+              
+              // 网络配置
+              maxLoadingDelay: 3,   // 减少最大加载延迟到3秒
+              maxRetryDelay: 6,     // 减少最大重试延迟到6秒
+              maxRetry: 2,          // 减少最大重试次数到2次，避免过度重试
+              
+              // 片段配置
+              fragLoadingTimeOut: 15000,    // 减少片段加载超时到15秒
+              manifestLoadingTimeOut: 8000, // 减少清单加载超时到8秒
+              fragLoadingMaxRetry: 2,       // 片段加载最大重试次数
+              manifestLoadingMaxRetry: 2,   // 清单加载最大重试次数
+              
+              // 启用自动质量切换
+              enableSoftwareAES: true,
+              startLevel: -1,       // 自动选择起始质量
+              capLevelToPlayerSize: true, // 根据播放器大小限制质量
+              
+              // 错误恢复配置
+              liveSyncDurationCount: 3,
+              liveMaxLatencyDurationCount: Infinity,
+              liveDurationInfinity: false,
+              
+              // 新增配置项，提高稳定性
+              nudgeOffset: 0.1,     // 微调偏移量
+              nudgeMaxRetry: 3,     // 微调最大重试次数
+              maxSeekHole: 2,       // 最大寻址空洞
+              
+              // 调试配置（生产环境可关闭）
+              debug: false,
             })
             
             hls.loadSource(url)
@@ -322,25 +381,118 @@ const initArtPlayer = async (url) => {
               console.log('HLS manifest 解析完成')
             })
             
+            // 错误重试计数器
+            let networkErrorRetries = 0
+            let mediaErrorRetries = 0
+            const maxErrorRetries = 2 // 减少重试次数
+            
             hls.on(Hls.Events.ERROR, (event, data) => {
-              console.error('HLS 错误:', data)
+              // 只记录致命错误，减少控制台噪音
               if (data.fatal) {
+                console.error('HLS 致命错误:', data.type, data.details)
+                
                 switch (data.type) {
                   case Hls.ErrorTypes.NETWORK_ERROR:
-                    console.log('网络错误，尝试恢复...')
-                    hls.startLoad()
+                    networkErrorRetries++
+                    
+                    if (networkErrorRetries <= maxErrorRetries) {
+                      console.log(`网络错误恢复中... (${networkErrorRetries}/${maxErrorRetries})`)
+                      // 延迟重试，避免频繁请求
+                      setTimeout(() => {
+                        hls.startLoad()
+                      }, 1000 * networkErrorRetries) // 递增延迟
+                    } else {
+                      console.error('网络错误重试次数超限')
+                      Message.error('网络连接不稳定，请检查网络后重试')
+                      hls.destroy()
+                    }
                     break
+                    
                   case Hls.ErrorTypes.MEDIA_ERROR:
-                    console.log('媒体错误，尝试恢复...')
-                    hls.recoverMediaError()
+                    mediaErrorRetries++
+                    
+                    if (mediaErrorRetries <= maxErrorRetries) {
+                      console.log(`媒体错误恢复中... (${mediaErrorRetries}/${maxErrorRetries})`)
+                      setTimeout(() => {
+                        hls.recoverMediaError()
+                      }, 500 * mediaErrorRetries) // 递增延迟
+                    } else {
+                      console.error('媒体错误恢复次数超限')
+                      Message.error('视频解码错误，请尝试刷新页面')
+                      hls.destroy()
+                    }
                     break
+                    
                   default:
-                    console.log('无法恢复的错误，销毁 HLS 实例')
+                    // 对于其他致命错误，不显示用户提示，只记录日志
+                    console.error('无法恢复的HLS错误:', data.details)
                     hls.destroy()
                     break
                 }
+              } else {
+                // 非致命错误，只在调试模式下记录
+                if (data.details !== 'bufferAppendError' && data.details !== 'bufferStalledError') {
+                  console.debug('HLS 非致命错误:', data.details)
+                }
+                
+                // 对于缓冲区错误，尝试自动恢复
+                if (data.details === 'bufferStalledError') {
+                  console.debug('检测到缓冲停滞，自动处理中...')
+                  // HLS.js 会自动处理这类错误，无需手动干预
+                }
               }
             })
+            
+            // 监听缓冲区事件，用于性能优化
+            hls.on(Hls.Events.BUFFER_APPENDED, () => {
+              // 缓冲区数据追加成功，可以在这里做一些清理工作
+            })
+            
+            hls.on(Hls.Events.BUFFER_EOS, () => {
+              console.debug('缓冲区到达流结束')
+            })
+            
+            // 监听缓冲区清理事件
+            hls.on(Hls.Events.BUFFER_FLUSHED, () => {
+              console.debug('缓冲区已清理')
+            })
+            
+            // 重置错误计数器（当播放成功时）
+            hls.on(Hls.Events.FRAG_LOADED, () => {
+              // 片段加载成功，重置错误计数
+              if (networkErrorRetries > 0 || mediaErrorRetries > 0) {
+                console.log('连接恢复正常，重置错误计数器')
+                networkErrorRetries = 0
+                mediaErrorRetries = 0
+              }
+            })
+            
+            // 监听质量切换事件
+            hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+              console.debug(`质量切换到: ${data.level}`)
+            })
+            
+            // 定期清理缓冲区，避免内存占用过多
+            let bufferCleanupInterval = setInterval(() => {
+              if (hls && video && !video.paused) {
+                const currentTime = video.currentTime
+                // 清理当前播放位置前15秒以外的缓冲区
+                if (currentTime > 15) {
+                  try {
+                    hls.trigger(Hls.Events.BUFFER_FLUSHING, {
+                      startOffset: 0,
+                      endOffset: currentTime - 15,
+                      type: 'video'
+                    })
+                  } catch (e) {
+                    console.debug('缓冲区清理失败:', e)
+                  }
+                }
+              }
+            }, 30000) // 每30秒清理一次
+            
+            // 存储清理定时器，用于后续清理
+            art.bufferCleanupInterval = bufferCleanupInterval
           } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
             // Safari 原生支持 HLS
             video.src = url
@@ -412,6 +564,8 @@ const initArtPlayer = async (url) => {
 
     art.on('video:loadstart', () => {
       console.log('开始加载视频')
+      // 重置片头片尾跳过状态
+      resetSkipState()
     })
 
     art.on('video:canplay', () => {
@@ -426,10 +580,37 @@ const initArtPlayer = async (url) => {
       handleTimeUpdate()
     })
 
+    // 监听用户拖动进度条事件
+    art.on('video:seeking', () => {
+      onUserSeekStart()
+    })
+
+    art.on('video:seeked', () => {
+      onUserSeekEnd()
+    })
+
     art.on('video:playing', () => {
       console.log('视频开始播放')
       // 视频开始播放时，重置重连计数器
       resetRetryState()
+      
+      // 立即尝试片头跳过（针对视频刚开始播放的情况）
+      const immediateSkipped = applyIntroSkipImmediate()
+      
+      // 如果立即跳过未执行，则使用常规跳过逻辑
+      if (!immediateSkipped) {
+        applySkipSettings()
+        
+        // 为了确保片头跳过生效，再次检查（短延迟）
+        setTimeout(() => {
+          applySkipSettings()
+        }, 50) // 减少延迟到50ms
+      }
+    })
+
+    // 监听全屏状态变化
+    art.on('fullscreen', (isFullscreen) => {
+      console.log('全屏状态变化:', isFullscreen)
     })
 
     art.on('video:error', (err) => {
@@ -750,6 +931,7 @@ const selectEpisode = (episode) => {
 watch(() => props.videoUrl, async (newUrl) => {
   if (newUrl && props.visible) {
     resetRetryState() // 重置重连状态
+    resetSkipState() // 重置片头片尾跳过状态
     await nextTick()
     await initArtPlayer(newUrl)
   }
@@ -803,6 +985,19 @@ onUnmounted(() => {
   
   // 销毁播放器实例
   if (artPlayerInstance.value) {
+    // 清理缓冲区清理定时器
+    if (artPlayerInstance.value.bufferCleanupInterval) {
+      clearInterval(artPlayerInstance.value.bufferCleanupInterval)
+      artPlayerInstance.value.bufferCleanupInterval = null
+    }
+    
+    // 清理 HLS 实例
+    if (artPlayerInstance.value.hls) {
+      artPlayerInstance.value.hls.destroy()
+      artPlayerInstance.value.hls = null
+    }
+    
+    // 销毁播放器实例
     artPlayerInstance.value.destroy()
     artPlayerInstance.value = null
   }
