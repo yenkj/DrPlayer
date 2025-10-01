@@ -80,8 +80,23 @@
         @episode-selected="handleEpisodeSelected"
       />
 
+      <!-- 小说阅读器组件 -->
+      <BookReader 
+        v-if="showBookReader && parsedNovelContent"
+        :book-detail="videoDetail"
+        :chapter-content="parsedNovelContent"
+        :chapters="currentRouteEpisodes"
+        :current-chapter-index="currentEpisode"
+        :visible="showBookReader"
+        @close="handleReaderClose"
+        @next-chapter="handleNextChapter"
+        @prev-chapter="handlePrevChapter"
+        @chapter-selected="handleChapterSelected"
+        @chapter-change="handleChapterChange"
+      />
+
       <!-- 视频信息卡片 -->
-      <a-card class="video-info-card" :class="{ 'collapsed-when-playing': showVideoPlayer }">
+      <a-card class="video-info-card" :class="{ 'collapsed-when-playing': showVideoPlayer || showBookReader }">
         <div class="video-header">
           <div class="video-poster" @click="showImageModal">
             <img :src="videoDetail.vod_pic" :alt="videoDetail.vod_name" @error="handleImageError" />
@@ -117,9 +132,10 @@
             <div v-if="currentEpisodeUrl" class="play-actions">
               <a-button type="primary" size="large" @click="playVideo" class="play-btn">
                 <template #icon>
-                  <icon-play-arrow />
+                  <icon-play-arrow v-if="!isNovelContent" />
+                  <icon-book v-else />
                 </template>
-                播放视频
+                {{ isNovelContent ? '开始阅读' : '播放视频' }}
               </a-button>
               <a-button @click="copyPlayUrl" class="copy-btn">
                 <template #icon>
@@ -216,6 +232,7 @@ import { usePageStateStore } from '@/stores/pageStateStore'
 import VideoPlayer from '@/components/players/VideoPlayer.vue'
 import ArtVideoPlayer from '@/components/players/ArtVideoPlayer.vue'
 import EpisodeSelector from '@/components/players/EpisodeSelector.vue'
+import BookReader from '@/components/readers/BookReader.vue'
 import ActionDialog from '@/components/actions/ActionDialog.vue'
 import { 
   IconLeft, 
@@ -223,7 +240,8 @@ import {
   IconCopy,
   IconHeart,
   IconHeartFill,
-  IconEye
+  IconEye,
+  IconBook
 } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
@@ -264,6 +282,11 @@ const currentSiteInfo = ref({
 const showVideoPlayer = ref(false)
 // 解析后的播放URL（用于T4接口解析结果）
 const parsedVideoUrl = ref('')
+
+// 小说阅读器相关
+const showBookReader = ref(false)
+// 解析后的小说内容（用于T4接口解析结果）
+const parsedNovelContent = ref(null)
 
 // 解析提示弹窗相关
 const showParseDialog = ref(false)
@@ -390,6 +413,11 @@ const currentEpisodeIndex = computed(() => {
 const isCurrentFavorited = computed(() => {
   if (!originalVideoInfo.value.id || !currentSiteInfo.value.api) return false
   return favoriteStore.isFavorited(originalVideoInfo.value.id, currentSiteInfo.value.api)
+})
+
+// 判断当前内容是否为小说
+const isNovelContent = computed(() => {
+  return parsedNovelContent.value !== null
 })
 
 // 方法
@@ -764,6 +792,42 @@ const handlePlayerClose = () => {
   showVideoPlayer.value = false
 }
 
+// 处理BookReader组件的关闭事件
+const handleReaderClose = () => {
+  showBookReader.value = false
+  parsedNovelContent.value = null
+}
+
+// 处理阅读器章节切换事件
+const handleChapterChange = (chapterIndex) => {
+  console.log('切换到章节:', chapterIndex)
+  selectEpisode(chapterIndex)
+}
+
+// 处理下一章事件
+const handleNextChapter = () => {
+  if (currentEpisode.value < currentRouteEpisodes.value.length - 1) {
+    const nextIndex = currentEpisode.value + 1
+    console.log('切换到下一章:', nextIndex)
+    selectEpisode(nextIndex)
+  }
+}
+
+// 处理上一章事件
+const handlePrevChapter = () => {
+  if (currentEpisode.value > 0) {
+    const prevIndex = currentEpisode.value - 1
+    console.log('切换到上一章:', prevIndex)
+    selectEpisode(prevIndex)
+  }
+}
+
+// 处理章节选择事件
+const handleChapterSelected = (chapterIndex) => {
+  console.log('选择章节:', chapterIndex)
+  selectEpisode(chapterIndex)
+}
+
 // 处理播放器类型变更
 const handlePlayerTypeChange = (newType) => {
   console.log('切换播放器类型:', newType)
@@ -834,15 +898,49 @@ const selectEpisode = async (index) => {
     // 根据解析结果处理播放
      if (parseResult.playType === 'direct') {
        // parse:0 - 直链播放
-       console.log('启动内置播放器播放直链视频:', parseResult.url)
-       parsedVideoUrl.value = parseResult.url
-       showVideoPlayer.value = true
-       Message.success(`开始播放: ${currentEpisodeName.value}`)
+       // 检查是否为小说内容
+       if (parseResult.url && parseResult.url.startsWith('novel://')) {
+         console.log('检测到小说内容:', parseResult.url)
+         try {
+           // 解析小说内容
+           const novelData = parseResult.url.replace('novel://', '')
+           const novelContent = JSON.parse(novelData)
+           
+           console.log('解析小说内容成功:', novelContent)
+           
+           // 设置小说内容并显示阅读器
+           parsedNovelContent.value = {
+             title: novelContent.title || currentEpisodeName.value,
+             content: novelContent.content || '',
+             chapterIndex: index,
+             totalChapters: currentRouteEpisodes.value.length
+           }
+           
+           // 关闭视频播放器，显示小说阅读器
+           showVideoPlayer.value = false
+           showBookReader.value = true
+           
+           Message.success(`开始阅读: ${novelContent.title || currentEpisodeName.value}`)
+         } catch (error) {
+           console.error('解析小说内容失败:', error)
+           Message.error('解析小说内容失败')
+         }
+       } else {
+         // 普通视频内容
+         console.log('启动内置播放器播放直链视频:', parseResult.url)
+         parsedVideoUrl.value = parseResult.url
+         parsedNovelContent.value = null
+         showBookReader.value = false
+         showVideoPlayer.value = true
+         Message.success(`开始播放: ${currentEpisodeName.value}`)
+       }
      } else if (parseResult.playType === 'sniff') {
        // parse:1 - 需要嗅探
        console.log('需要嗅探播放:', parseResult)
-       // 清空解析URL，不启动播放器
+       // 清空解析URL和小说内容，不启动播放器
        parsedVideoUrl.value = ''
+       parsedNovelContent.value = null
+       showBookReader.value = false
        
        // 显示嗅探提示弹窗
        parseDialogConfig.value = {
@@ -854,8 +952,10 @@ const selectEpisode = async (index) => {
      } else if (parseResult.playType === 'parse') {
        // jx:1 - 需要解析
        console.log('需要解析播放:', parseResult)
-       // 清空解析URL，不启动播放器
+       // 清空解析URL和小说内容，不启动播放器
        parsedVideoUrl.value = ''
+       parsedNovelContent.value = null
+       showBookReader.value = false
        
        // 显示解析提示弹窗
        parseDialogConfig.value = {
@@ -868,6 +968,8 @@ const selectEpisode = async (index) => {
        // 其他情况，回退到原始播放方式
        console.log('使用原始播放方式:', episodeUrl)
        parsedVideoUrl.value = ''
+       parsedNovelContent.value = null
+       showBookReader.value = false
        showVideoPlayer.value = true
        Message.success(`开始播放: ${currentEpisodeName.value}`)
      }
@@ -878,6 +980,8 @@ const selectEpisode = async (index) => {
      // 解析失败时回退到原始播放方式
      console.log('回退到原始播放方式:', episodeUrl)
      parsedVideoUrl.value = ''
+     parsedNovelContent.value = null
+     showBookReader.value = false
      showVideoPlayer.value = true
      Message.warning(`播放可能不稳定: ${currentEpisodeName.value}`)
    }
