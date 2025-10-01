@@ -95,6 +95,23 @@
         @chapter-change="handleChapterChange"
       />
 
+      <!-- 漫画阅读器组件 -->
+      <ComicReader 
+        v-if="showComicReader && parsedComicContent"
+        :comic-detail="videoDetail"
+        :comic-title="videoDetail?.vod_name"
+        :chapter-name="currentEpisodeName"
+        :chapters="currentRouteEpisodes"
+        :current-chapter-index="currentEpisode"
+        :comic-content="parsedComicContent"
+        :visible="showComicReader"
+        @close="handleReaderClose"
+        @next-chapter="handleNextChapter"
+        @prev-chapter="handlePrevChapter"
+        @chapter-selected="handleChapterSelected"
+        @settings-change="handleSettingsChange"
+      />
+
       <!-- 视频信息卡片 -->
       <a-card class="video-info-card" :class="{ 'collapsed-when-playing': showVideoPlayer || showBookReader }">
         <div class="video-header">
@@ -132,10 +149,11 @@
             <div v-if="currentEpisodeUrl" class="play-actions">
               <a-button type="primary" size="large" @click="playVideo" class="play-btn">
                 <template #icon>
-                  <icon-play-arrow v-if="!isNovelContent" />
-                  <icon-book v-else />
+                  <icon-play-arrow v-if="!isNovelContent && !isComicContent" />
+                  <icon-book v-else-if="isNovelContent" />
+                  <icon-image v-else-if="isComicContent" />
                 </template>
-                {{ isNovelContent ? '开始阅读' : '播放视频' }}
+                {{ isNovelContent ? '开始阅读' : isComicContent ? '开始看漫画' : '播放视频' }}
               </a-button>
               <a-button @click="copyPlayUrl" class="copy-btn">
                 <template #icon>
@@ -233,6 +251,7 @@ import VideoPlayer from '@/components/players/VideoPlayer.vue'
 import ArtVideoPlayer from '@/components/players/ArtVideoPlayer.vue'
 import EpisodeSelector from '@/components/players/EpisodeSelector.vue'
 import BookReader from '@/components/readers/BookReader.vue'
+import ComicReader from '@/components/readers/ComicReader.vue'
 import ActionDialog from '@/components/actions/ActionDialog.vue'
 import { 
   IconLeft, 
@@ -241,7 +260,8 @@ import {
   IconHeart,
   IconHeartFill,
   IconEye,
-  IconBook
+  IconBook,
+  IconImage
 } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
@@ -287,6 +307,11 @@ const parsedVideoUrl = ref('')
 const showBookReader = ref(false)
 // 解析后的小说内容（用于T4接口解析结果）
 const parsedNovelContent = ref(null)
+
+// 漫画阅读器相关
+const showComicReader = ref(false)
+// 解析后的漫画内容（用于T4接口解析结果）
+const parsedComicContent = ref(null)
 
 // 解析提示弹窗相关
 const showParseDialog = ref(false)
@@ -418,6 +443,11 @@ const isCurrentFavorited = computed(() => {
 // 判断当前内容是否为小说
 const isNovelContent = computed(() => {
   return parsedNovelContent.value !== null
+})
+
+// 判断当前内容是否为漫画
+const isComicContent = computed(() => {
+  return showComicReader.value
 })
 
 // 方法
@@ -792,10 +822,12 @@ const handlePlayerClose = () => {
   showVideoPlayer.value = false
 }
 
-// 处理BookReader组件的关闭事件
+// 处理阅读器组件的关闭事件（小说和漫画）
 const handleReaderClose = () => {
   showBookReader.value = false
+  showComicReader.value = false
   parsedNovelContent.value = null
+  parsedComicContent.value = null
 }
 
 // 处理阅读器章节切换事件
@@ -867,6 +899,12 @@ const handleEpisodeSelected = (episode) => {
   }
 }
 
+// 处理阅读器设置变更事件
+const handleSettingsChange = (settings) => {
+  console.log('阅读器设置变更:', settings)
+  // 这里可以添加设置保存逻辑，如果需要的话
+}
+
 const selectEpisode = async (index) => {
   currentEpisode.value = index
   
@@ -916,8 +954,9 @@ const selectEpisode = async (index) => {
              totalChapters: currentRouteEpisodes.value.length
            }
            
-           // 关闭视频播放器，显示小说阅读器
+           // 关闭视频播放器和漫画阅读器，显示小说阅读器
            showVideoPlayer.value = false
+           showComicReader.value = false
            showBookReader.value = true
            
            Message.success(`开始阅读: ${novelContent.title || currentEpisodeName.value}`)
@@ -925,12 +964,41 @@ const selectEpisode = async (index) => {
            console.error('解析小说内容失败:', error)
            Message.error('解析小说内容失败')
          }
+       } else if (parseResult.url && parseResult.url.startsWith('pics://')) {
+         console.log('检测到漫画内容:', parseResult.url)
+         try {
+           // 解析漫画内容
+           const comicData = parseResult.url.replace('pics://', '')
+           const imageUrls = comicData.split('&&').filter(url => url.trim())
+           
+           console.log('解析漫画内容成功:', imageUrls)
+           
+           // 设置漫画内容并显示阅读器
+           parsedComicContent.value = {
+             title: currentEpisodeName.value,
+             images: imageUrls,
+             chapterIndex: index,
+             totalChapters: currentRouteEpisodes.value.length
+           }
+           
+           // 关闭视频播放器和小说阅读器，显示漫画阅读器
+           showVideoPlayer.value = false
+           showBookReader.value = false
+           showComicReader.value = true
+           
+           Message.success(`开始看漫画: ${currentEpisodeName.value}`)
+         } catch (error) {
+           console.error('解析漫画内容失败:', error)
+           Message.error('解析漫画内容失败')
+         }
        } else {
          // 普通视频内容
          console.log('启动内置播放器播放直链视频:', parseResult.url)
          parsedVideoUrl.value = parseResult.url
          parsedNovelContent.value = null
+         parsedComicContent.value = null
          showBookReader.value = false
+         showComicReader.value = false
          showVideoPlayer.value = true
          Message.success(`开始播放: ${currentEpisodeName.value}`)
        }
