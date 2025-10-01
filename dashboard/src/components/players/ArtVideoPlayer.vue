@@ -568,13 +568,11 @@ const initArtPlayer = async (url) => {
     })
 
     art.on('video:loadstart', () => {
-      console.log('开始加载视频')
       // 重置片头片尾跳过状态
       resetSkipState()
     })
 
     art.on('video:canplay', () => {
-      console.log('视频可以播放')
       // 视频可以播放时，重置重连计数器
       resetRetryState()
       // 应用片头片尾设置
@@ -595,7 +593,6 @@ const initArtPlayer = async (url) => {
     })
 
     art.on('video:playing', () => {
-      console.log('视频开始播放')
       // 视频开始播放时，重置重连计数器
       resetRetryState()
       
@@ -615,8 +612,6 @@ const initArtPlayer = async (url) => {
 
     // 监听全屏状态变化
     art.on('fullscreen', (isFullscreen) => {
-      console.log('全屏状态变化:', isFullscreen)
-      
       // 标记全屏状态开始变化
       onFullscreenChangeStart()
       
@@ -751,7 +746,6 @@ const handleRetry = (url) => {
 const resetRetryState = () => {
   retryCount.value = 0
   isRetrying.value = false
-  console.log('重连状态已重置')
 }
 
 // 计算动态高度
@@ -829,13 +823,11 @@ const cancelAutoNext = () => {
 // 立即播放下一集
 const playNextEpisode = () => {
   if (!hasNextEpisode()) {
-    console.log('已经是最后一集')
     Message.info('已经是最后一集了')
     return
   }
   
   const nextEpisode = getNextEpisode()
-  console.log('播放下一集:', nextEpisode.name)
   
   // 清理倒计时
   cancelAutoNext()
@@ -850,7 +842,6 @@ const playNextEpisode = () => {
 // 切换自动下一集开关
 const toggleAutoNext = () => {
   autoNextEnabled.value = !autoNextEnabled.value
-  console.log('自动下一集开关:', autoNextEnabled.value ? '开启' : '关闭')
   
   if (!autoNextEnabled.value) {
     cancelAutoNext()

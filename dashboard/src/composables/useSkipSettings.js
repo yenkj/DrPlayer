@@ -102,16 +102,8 @@ export function useSkipSettings(options = {}) {
    * 立即应用片头跳过逻辑（用于视频刚开始播放时）
    */
   const applyIntroSkipImmediate = () => {
-    console.log('applyIntroSkipImmediate 被调用')
-    
-    if (!skipIntroEnabled.value) {
-      console.log('片头跳过未启用')
-      return
-    }
-    
-    if (skipIntroApplied.value) {
-      console.log('片头跳过已应用，跳过')
-      return
+    if (!skipIntroEnabled.value || skipIntroApplied.value) {
+      return false
     }
 
     const currentTime = getCurrentTime()
@@ -119,29 +111,20 @@ export function useSkipSettings(options = {}) {
     
     // 检查用户是否正在拖动或刚刚拖动过（3秒内）
     if (userSeeking.value || (lastUserSeekTime.value > 0 && now - lastUserSeekTime.value < 3000)) {
-      console.log('用户正在拖动进度条或刚刚拖动过，跳过自动片头跳过')
-      return
+      return false
     }
     
     // 检查是否正在全屏切换或刚刚切换过（2秒内）
     if (isFullscreenChanging.value || (lastFullscreenChangeTime.value > 0 && now - lastFullscreenChangeTime.value < 2000)) {
-      console.log('正在全屏切换或刚刚切换过，跳过自动片头跳过')
-      return
-    }
-    
-    // 检查是否正在全屏切换或刚刚切换过（2秒内）
-    if (isFullscreenChanging.value || (lastFullscreenChangeTime.value > 0 && now - lastFullscreenChangeTime.value < 2000)) {
-      console.log('正在全屏切换或刚刚切换过，跳过自动片头跳过')
-      return
+      return false
     }
     
     // 立即跳过模式：如果当前时间很小（小于等于1秒）且在片头跳过范围内，立即跳过
     if (currentTime <= 1 && currentTime <= skipIntroSeconds.value) {
-      console.log(`立即跳过片头：从 ${currentTime} 秒跳转到 ${skipIntroSeconds.value} 秒`)
+      console.log(`立即跳过片头：从 ${currentTime.toFixed(1)}s 跳转到 ${skipIntroSeconds.value}s`)
       setCurrentTime(skipIntroSeconds.value)
       skipIntroApplied.value = true
       lastSkipTime.value = now
-      console.log(`已立即跳过片头 ${skipIntroSeconds.value} 秒`)
       return true // 返回 true 表示已执行跳过
     }
     
@@ -152,21 +135,7 @@ export function useSkipSettings(options = {}) {
    * 应用片头跳过逻辑
    */
   const applyIntroSkip = () => {
-    console.log('applyIntroSkip 被调用', {
-      skipIntroEnabled: skipIntroEnabled.value,
-      skipIntroApplied: skipIntroApplied.value,
-      currentTime: getCurrentTime(),
-      skipIntroSeconds: skipIntroSeconds.value,
-      userSeeking: userSeeking.value
-    })
-    
-    if (!skipIntroEnabled.value) {
-      console.log('片头跳过未启用')
-      return
-    }
-    
-    if (skipIntroApplied.value) {
-      console.log('片头跳过已应用，跳过')
+    if (!skipIntroEnabled.value || skipIntroApplied.value) {
       return
     }
 
@@ -175,32 +144,25 @@ export function useSkipSettings(options = {}) {
     
     // 检查用户是否正在拖动或刚刚拖动过（3秒内）
     if (userSeeking.value || (lastUserSeekTime.value > 0 && now - lastUserSeekTime.value < 3000)) {
-      console.log('用户正在拖动进度条或刚刚拖动过，跳过自动片头跳过')
       return
     }
     
     // 检查是否正在全屏切换或刚刚切换过（2秒内）
     if (isFullscreenChanging.value || (lastFullscreenChangeTime.value > 0 && now - lastFullscreenChangeTime.value < 2000)) {
-      console.log('正在全屏切换或刚刚切换过，跳过自动片头跳过')
       return
     }
     
     // 防抖：如果距离上次跳过不足1秒，则忽略（但如果是新视频，lastSkipTime为0，允许跳过）
-    // 减少防抖时间，提高响应速度
     if (lastSkipTime.value > 0 && now - lastSkipTime.value < 1000) {
-      console.log('防抖限制，跳过')
       return
     }
     
     // 如果当前时间在片头跳过范围内，则跳过
     if (currentTime <= skipIntroSeconds.value) {
-      console.log(`准备跳过片头：从 ${currentTime} 秒跳转到 ${skipIntroSeconds.value} 秒`)
+      console.log(`已跳过片头：从 ${currentTime.toFixed(1)}s 跳转到 ${skipIntroSeconds.value}s`)
       setCurrentTime(skipIntroSeconds.value)
       skipIntroApplied.value = true
       lastSkipTime.value = now
-      console.log(`已跳过片头 ${skipIntroSeconds.value} 秒`)
-    } else {
-      console.log(`当前时间 ${currentTime} 秒已超过片头跳过范围 ${skipIntroSeconds.value} 秒`)
     }
   }
 
@@ -247,19 +209,29 @@ export function useSkipSettings(options = {}) {
     applyOutroSkip()
   }
 
+  // 防抖变量
+  let timeUpdateDebounceTimer = null
+  
   /**
    * 处理时间更新事件
    */
   const handleTimeUpdate = () => {
-    // 应用片头跳过（仅在未应用时）
-    if (skipIntroEnabled.value && !skipIntroApplied.value) {
-      applyIntroSkip()
+    // 防抖：减少频繁调用，每200ms最多执行一次
+    if (timeUpdateDebounceTimer) {
+      clearTimeout(timeUpdateDebounceTimer)
     }
+    
+    timeUpdateDebounceTimer = setTimeout(() => {
+      // 应用片头跳过（仅在未应用时）
+      if (skipIntroEnabled.value && !skipIntroApplied.value) {
+        applyIntroSkip()
+      }
 
-    // 应用片尾跳过（仅在未应用时）
-    if (skipOutroEnabled.value && !skipOutroApplied.value) {
-      applyOutroSkip()
-    }
+      // 应用片尾跳过（仅在未应用时）
+      if (skipOutroEnabled.value && !skipOutroApplied.value) {
+        applyOutroSkip()
+      }
+    }, 200)
   }
 
   /**

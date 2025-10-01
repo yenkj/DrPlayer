@@ -288,14 +288,11 @@ const isDirectVideoLink = (url) => {
 const initVideoPlayer = (url) => {
   if (!videoPlayer.value || !url) return
   
-  console.log('初始化视频播放器:', url)
-  
   // 重置片头片尾跳过状态
   resetSkipState()
   
   // 首先判断链接类型
   if (!isDirectVideoLink(url)) {
-    console.log('检测到网页链接，在新窗口打开:', url)
     Message.info('检测到网页链接，正在新窗口打开...')
     window.open(url, '_blank')
     emit('close') // 关闭播放器
@@ -312,11 +309,8 @@ const initVideoPlayer = (url) => {
   
   // 视频结束事件处理函数
   const handleVideoEnded = () => {
-    console.log('视频播放结束')
-    
     // 防抖：如果正在处理自动连播，则忽略
     if (isProcessingAutoNext.value) {
-      console.log('正在处理自动连播，忽略重复的ended事件')
       return
     }
     
@@ -402,12 +396,10 @@ const initVideoPlayer = (url) => {
     }
   } else {
     // 处理其他格式的视频（mp4, webm, avi等）
-    console.log('播放普通视频格式:', url)
     video.src = url
     
     // 添加事件监听器
     const handleLoadedMetadata = () => {
-      console.log('视频元数据加载完成，开始播放')
       video.play().catch(err => {
         console.warn('自动播放失败:', err)
         Message.warning('自动播放失败，请手动点击播放')
@@ -422,7 +414,6 @@ const initVideoPlayer = (url) => {
       
       // 如果播放失败，再次检查是否为网页链接
       if (!isDirectVideoLink(url)) {
-        console.log('播放失败，检测到可能是网页链接，在新窗口打开:', url)
         Message.info('视频播放失败，检测到网页链接，正在新窗口打开...')
         window.open(url, '_blank')
         emit('close') // 关闭播放器
@@ -433,13 +424,11 @@ const initVideoPlayer = (url) => {
     }
     
     const handleLoadStart = () => {
-      console.log('开始加载视频')
       // 重置片头片尾跳过状态
       resetSkipState()
     }
     
     const handlePlaying = () => {
-      console.log('视频开始播放')
       // 延迟一点应用跳过设置，确保视频已经开始播放
       setTimeout(() => {
         applySkipSettings()
