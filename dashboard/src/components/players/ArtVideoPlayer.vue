@@ -38,28 +38,7 @@
       </div>
     </div>
     
-    <!-- 选集列表弹窗 -->
-    <div v-if="showEpisodeDialog" class="episode-dialog">
-      <div class="episode-dialog-overlay" @click="closeEpisodeDialog"></div>
-      <div class="episode-dialog-content">
-        <div class="episode-dialog-header">
-          <h3>选择集数</h3>
-          <button @click="closeEpisodeDialog" class="episode-close-btn">×</button>
-        </div>
-        <div ref="episodeListRef" class="episode-list">
-          <button 
-            v-for="(episode, index) in props.episodes" 
-            :key="index"
-            :ref="el => { if (index === props.currentEpisodeIndex) currentEpisodeRef = el }"
-            @click="selectEpisode(episode)"
-            :class="['episode-item', { 'current': index === props.currentEpisodeIndex }]"
-          >
-            <span class="episode-number">{{ index + 1 }}</span>
-            <span class="episode-name">{{ episode.name || `第${index + 1}集` }}</span>
-          </button>
-        </div>
-      </div>
-    </div>
+
     
     <!-- 片头片尾设置弹窗 -->
     <SkipSettingsDialog
@@ -143,10 +122,7 @@ const autoNextTimer = ref(null) // 自动下一集定时器
 const showAutoNextDialog = ref(false) // 显示自动下一集对话框
 const countdownEnabled = ref(false) // 倒计时开关，默认关闭
 
-// 选集弹窗相关数据
-const showEpisodeDialog = ref(false) // 显示选集弹窗
-const episodeListRef = ref(null) // 选集列表容器引用
-const currentEpisodeRef = ref(null) // 当前选集按钮引用
+// 选集弹窗相关数据已移除，现在使用ArtPlayer的layer功能
 
 // 使用片头片尾设置组合式函数
 const {
@@ -524,7 +500,7 @@ const initArtPlayer = async (url) => {
           tooltip: props.episodes.length > 1 ? '选择集数' : '',
           style: props.episodes.length > 1 ? {} : { display: 'none' },
           click: function () {
-            toggleEpisodeDialog()
+            toggleEpisodeLayer()
           },
         },
         {
@@ -555,7 +531,31 @@ const initArtPlayer = async (url) => {
         },
       ],
       // 图层配置
-      layers: [],
+      layers: [
+        {
+          name: 'episodeLayer',
+          html: '',
+          style: {
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            background: 'rgba(0, 0, 0, 0.8)',
+            display: 'none',
+            zIndex: '100',
+            padding: '0',
+            boxSizing: 'border-box',
+            overflow: 'hidden'
+          },
+          click: function(event) {
+            // 点击背景关闭layer
+            if (event.target.classList.contains('episode-layer-background')) {
+              hideEpisodeLayer()
+            }
+          }
+        }
+      ],
       // 插件配置
       plugins: [],
     })
@@ -910,35 +910,165 @@ const scrollToCurrentEpisode = async () => {
   }
 }
 
-// 切换选集弹窗显示状态
-const toggleEpisodeDialog = async () => {
-  showEpisodeDialog.value = !showEpisodeDialog.value
-  console.log('选集弹窗:', showEpisodeDialog.value ? '显示' : '隐藏')
+// 创建选集layer的HTML内容
+const createEpisodeLayerHTML = () => {
+  if (!props.episodes || props.episodes.length === 0) {
+    return '<div class="episode-layer-background"></div>'
+  }
   
-  // 如果弹窗打开，等待弹窗动画完成后再滚动
-  if (showEpisodeDialog.value) {
-    // 延迟350ms，等待弹窗动画完成（CSS动画时长为300ms）
-    setTimeout(async () => {
-      await scrollToCurrentEpisode()
-    }, 350)
+  const episodeItems = props.episodes.map((episode, index) => {
+    const isCurrentEpisode = index === props.currentEpisodeIndex
+    return `
+      <button 
+        class="episode-layer-item ${isCurrentEpisode ? 'current' : ''}" 
+        data-episode-index="${index}"
+      >
+        <span class="episode-layer-number">${index + 1}</span>
+        <span class="episode-layer-name">${episode.name || `第${index + 1}集`}</span>
+      </button>
+    `
+  }).join('')
+  
+  return `
+    <div class="episode-layer-background">
+      <div class="episode-layer-content">
+        <div class="episode-layer-header">
+          <h3>选择集数</h3>
+          <button class="episode-layer-close">×</button>
+        </div>
+        <div class="episode-layer-list">
+          ${episodeItems}
+        </div>
+      </div>
+    </div>
+  `
+}
+
+// 显示选集layer
+const showEpisodeLayer = () => {
+  if (!artPlayerInstance.value) return
+  
+  try {
+    // 更新layer内容和样式
+    artPlayerInstance.value.layers.update({
+      name: 'episodeLayer',
+      html: createEpisodeLayerHTML(),
+      style: {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        background: 'rgba(0, 0, 0, 0.8)',
+        display: 'flex',
+        zIndex: '100',
+        padding: '0',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }
+    })
+    
+    // 添加事件监听器
+    nextTick(() => {
+      const episodeLayer = artPlayerInstance.value.layers.episodeLayer
+      if (episodeLayer) {
+        // 使用事件委托处理点击事件
+        episodeLayer.addEventListener('click', handleEpisodeLayerClick)
+      }
+    })
+    
+    console.log('显示选集layer')
+  } catch (error) {
+    console.error('显示选集layer失败:', error)
   }
 }
 
-// 关闭选集弹窗
-const closeEpisodeDialog = () => {
-  showEpisodeDialog.value = false
+// 处理选集layer的点击事件
+const handleEpisodeLayerClick = (event) => {
+  const target = event.target.closest('.episode-layer-item')
+  const closeBtn = event.target.closest('.episode-layer-close')
+  const background = event.target.closest('.episode-layer-background')
+  
+  if (closeBtn || (background && event.target === background)) {
+    // 点击关闭按钮或背景，隐藏layer
+    hideEpisodeLayer()
+  } else if (target) {
+    // 点击选集项
+    const episodeIndex = parseInt(target.dataset.episodeIndex)
+    if (!isNaN(episodeIndex)) {
+      selectEpisodeFromLayer(episodeIndex)
+      hideEpisodeLayer()
+    }
+  }
 }
 
-// 选择剧集
-const selectEpisode = (episode) => {
-  console.log('选择剧集:', episode)
+// 隐藏选集layer
+const hideEpisodeLayer = () => {
+  if (!artPlayerInstance.value) return
   
-  // 关闭弹窗
-  closeEpisodeDialog()
+  try {
+    // 移除事件监听器
+    const episodeLayer = artPlayerInstance.value.layers.episodeLayer
+    if (episodeLayer) {
+      episodeLayer.removeEventListener('click', handleEpisodeLayerClick)
+    }
+    
+    // 隐藏layer
+    artPlayerInstance.value.layers.update({
+      name: 'episodeLayer',
+      html: '',
+      style: {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        background: 'rgba(0, 0, 0, 0.8)',
+        display: 'none',
+        zIndex: '100',
+        padding: '0',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
+      }
+    })
+    console.log('隐藏选集layer')
+  } catch (error) {
+    console.error('隐藏选集layer失败:', error)
+  }
+}
+
+// 切换选集layer显示状态
+const toggleEpisodeLayer = () => {
+  if (!artPlayerInstance.value) return
+  
+  try {
+    const episodeLayer = artPlayerInstance.value.layers.episodeLayer
+    if (episodeLayer && episodeLayer.style.display !== 'none') {
+      hideEpisodeLayer()
+    } else {
+      showEpisodeLayer()
+    }
+  } catch (error) {
+    console.error('切换选集layer失败:', error)
+    // 如果出错，尝试直接显示
+    showEpisodeLayer()
+  }
+}
+
+// 从layer中选择剧集
+const selectEpisodeFromLayer = (episodeIndex) => {
+  console.log('从layer选择剧集:', episodeIndex)
   
   // 发送选集事件给父组件
-  emit('episode-selected', episode)
+  const episode = props.episodes[episodeIndex]
+  if (episode) {
+    emit('episode-selected', episode)
+  }
 }
+
+// 原有的选集弹窗函数已移除，现在使用ArtPlayer的layer功能
 
 // 监听视频URL变化
 watch(() => props.videoUrl, async (newUrl) => {
@@ -1283,142 +1413,299 @@ onUnmounted(() => {
   background: #555;
 }
 
-/* 选集弹窗样式 */
-.episode-dialog {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10000;
-  display: flex;
+/* 原有的选集弹窗样式已移除，现在使用ArtPlayer的layer功能 */
+
+/* 选集Layer样式 - 现代化设计 */
+:deep(.art-layer[data-name="episodeLayer"]) {
+  display: flex !important;
   align-items: center;
   justify-content: center;
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-.episode-dialog-overlay {
+:deep(.episode-layer-background) {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
 }
 
-.episode-dialog-content {
-  position: relative;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-  max-width: 600px;
-  max-height: 80vh;
-  width: 90%;
+:deep(.episode-layer-content) {
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 
+    0 32px 64px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  max-width: 900px;
+  max-height: 60vh;
+  width: 95%;
   overflow: hidden;
-  animation: episodeDialogShow 0.3s ease-out;
+  animation: episodeLayerShow 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
-@keyframes episodeDialogShow {
+@keyframes episodeLayerShow {
   from {
     opacity: 0;
-    transform: scale(0.9) translateY(-20px);
+    transform: scale(0.8) translateY(-40px);
+    filter: blur(4px);
   }
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
+    filter: blur(0);
   }
 }
 
-.episode-dialog-header {
+:deep(.episode-layer-header) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e8e8e8;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.episode-dialog-header h3 {
+:deep(.episode-layer-header h3) {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #2c3e50;
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.episode-close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
+:deep(.episode-layer-close) {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 18px;
   cursor: pointer;
-  color: #666;
-  width: 32px;
-  height: 32px;
+  color: rgba(255, 255, 255, 0.8);
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 300;
 }
 
-.episode-close-btn:hover {
-  background: rgba(0, 0, 0, 0.1);
-  color: #333;
+:deep(.episode-layer-close:hover) {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transform: scale(1.05);
 }
 
-.episode-list {
-  padding: 16px;
-  max-height: 60vh;
+:deep(.episode-layer-close:active) {
+  transform: scale(0.95);
+}
+
+:deep(.episode-layer-list) {
+  padding: 16px 20px 20px;
+  max-height: 45vh;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
-.episode-item {
+/* 自定义滚动条 */
+:deep(.episode-layer-list::-webkit-scrollbar) {
+  width: 6px;
+}
+
+:deep(.episode-layer-list::-webkit-scrollbar-track) {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+:deep(.episode-layer-list::-webkit-scrollbar-thumb) {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  transition: background 0.3s ease;
+}
+
+:deep(.episode-layer-list::-webkit-scrollbar-thumb:hover) {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+:deep(.episode-layer-item) {
   display: flex;
   align-items: center;
   padding: 12px 16px;
-  border: 2px solid #e8e8e8;
-  border-radius: 8px;
-  background: white;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left;
-  min-height: 60px;
+  min-height: 56px;
+  position: relative;
+  overflow: hidden;
 }
 
-.episode-item:hover {
-  border-color: #23ade5;
-  background: #f8fcff;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(35, 173, 229, 0.2);
+:deep(.episode-layer-item::before) {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
 }
 
-.episode-item.current {
-  border-color: #23ade5;
-  background: linear-gradient(135deg, #23ade5 0%, #1e90ff 100%);
-  color: white;
-  box-shadow: 0 4px 12px rgba(35, 173, 229, 0.3);
+:deep(.episode-layer-item:hover) {
+  border-color: rgba(64, 150, 255, 0.4);
+  background: rgba(64, 150, 255, 0.08);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 
+    0 8px 32px rgba(64, 150, 255, 0.15),
+    0 0 0 1px rgba(64, 150, 255, 0.2);
 }
 
-.episode-item.current:hover {
-  background: linear-gradient(135deg, #1e90ff 0%, #23ade5 100%);
+:deep(.episode-layer-item:hover::before) {
+  opacity: 1;
 }
 
-.episode-number {
+:deep(.episode-layer-item.current) {
+  border-color: rgba(64, 150, 255, 0.6);
+  background: linear-gradient(135deg, rgba(64, 150, 255, 0.2) 0%, rgba(100, 180, 255, 0.15) 100%);
+  color: #ffffff;
+  box-shadow: 
+    0 8px 32px rgba(64, 150, 255, 0.25),
+    0 0 0 1px rgba(64, 150, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transform: scale(1.02);
+}
+
+:deep(.episode-layer-item.current::before) {
+  opacity: 1;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 100%);
+}
+
+:deep(.episode-layer-item.current:hover) {
+  background: linear-gradient(135deg, rgba(64, 150, 255, 0.25) 0%, rgba(100, 180, 255, 0.2) 100%);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 
+    0 12px 40px rgba(64, 150, 255, 0.3),
+    0 0 0 1px rgba(64, 150, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+:deep(.episode-layer-number) {
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 700;
   margin-right: 12px;
-  min-width: 24px;
-  text-align: center;
+  min-width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.3s ease;
 }
 
-.episode-name {
+.episode-layer-item.current .episode-layer-number {
+  background: rgba(64, 150, 255, 0.3);
+  border-color: rgba(64, 150, 255, 0.4);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(64, 150, 255, 0.2);
+}
+
+:deep(.episode-layer-name) {
   font-size: 14px;
+  font-weight: 500;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+:deep(.episode-layer-item.current .episode-layer-name) {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  :deep(.episode-layer-list) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  :deep(.episode-layer-content) {
+    max-width: 95%;
+    margin: 0 12px;
+    max-height: 70vh;
+  }
+  
+  :deep(.episode-layer-list) {
+    grid-template-columns: 1fr;
+    padding: 16px 20px 20px;
+    gap: 12px;
+    max-height: 50vh;
+  }
+  
+  :deep(.episode-layer-item) {
+    min-height: 60px;
+    padding: 12px 14px;
+  }
+  
+  :deep(.episode-layer-number) {
+    min-width: 26px;
+    height: 26px;
+    font-size: 15px;
+    margin-right: 10px;
+  }
+  
+  :deep(.episode-layer-name) {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  :deep(.episode-layer-background) {
+    padding: 12px;
+  }
+  
+  :deep(.episode-layer-content) {
+    max-height: 75vh;
+  }
+  
+  :deep(.episode-layer-header) {
+    padding: 14px 16px 10px;
+  }
+  
+  :deep(.episode-layer-header h3) {
+    font-size: 18px;
+  }
+  
+  :deep(.episode-layer-list) {
+    max-height: 55vh;
+    padding: 12px 16px 16px;
+  }
 }
 
 
