@@ -1,62 +1,19 @@
 <template>
   <a-card v-if="visible && videoUrl" class="video-player-section">
-    <div class="player-header">
-      <h3>正在播放: {{ episodeName }}</h3>
-      <div class="player-controls">
-        <div class="compact-button-group">
-          <div class="compact-btn" :class="{ active: autoNext }" @click="toggleAutoNext">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M5 3l14 9-14 9V3z" fill="currentColor"/>
-              <path d="M19 3v18" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <span class="btn-text">自动连播</span>
-          </div>
-          
-          <div class="compact-btn" :class="{ active: showCountdown }" @click="toggleCountdown">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-              <polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <span class="btn-text">倒计时</span>
-          </div>
-          
-          <div class="compact-btn selector-btn">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
-              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <a-select
-              :model-value="playerType"
-              @change="handlePlayerTypeChange"
-              class="compact-select"
-              size="small"
-            >
-              <a-option value="default">默认播放器</a-option>
-              <a-option value="artplayer">ArtPlayer</a-option>
-            </a-select>
-          </div>
-          
-          <div class="compact-btn" :class="{ active: skipEnabled }" @click="showSkipSettingsDialog = true">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M5 4l10 8-10 8V4z" fill="currentColor"/>
-              <path d="M19 5v14" stroke="currentColor" stroke-width="2"/>
-              <path d="M3 12h2" stroke="currentColor" stroke-width="2"/>
-              <path d="M19 12h2" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <span class="btn-text">片头片尾</span>
-          </div>
-          
-          <div class="compact-btn close-btn" @click="closePlayer">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
-              <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <span class="btn-text">关闭</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- 使用PlayerHeader组件 -->
+    <PlayerHeader
+      :episode-name="episodeName"
+      :player-type="playerType"
+      :episodes="episodes"
+      :auto-next-enabled="autoNext"
+      :countdown-enabled="showCountdown"
+      :skip-enabled="skipEnabled"
+      @toggle-auto-next="toggleAutoNext"
+      @toggle-countdown="toggleCountdown"
+      @player-change="handlePlayerTypeChange"
+      @open-skip-settings="openSkipSettingsDialog"
+      @close="closePlayer"
+    />
     <div class="video-player-container">
       <video 
         ref="videoPlayer"
@@ -88,60 +45,16 @@
         </div>
       </div>
       
-      <!-- 片头片尾设置弹窗 -->
-      <div v-if="showSkipSettingsDialog" class="skip-settings-dialog">
-        <div class="skip-settings-overlay" @click="closeSkipSettingsDialog"></div>
-        <div class="skip-settings-content">
-          <div class="skip-settings-header">
-            <h3>片头片尾设置</h3>
-            <button @click="closeSkipSettingsDialog" class="skip-close-btn">×</button>
-          </div>
-          <div class="skip-settings-body">
-            <div class="skip-setting-row">
-              <div class="skip-setting-label">
-                <a-switch v-model="skipIntroEnabled" size="small" />
-                <span>跳过片头</span>
-              </div>
-              <div class="skip-setting-input">
-                <a-input-number 
-                  v-model="skipIntroSeconds" 
-                  :min="0" 
-                  :max="300" 
-                  :disabled="!skipIntroEnabled"
-                  size="small"
-                  style="width: 80px"
-                />
-                <span class="unit">秒</span>
-              </div>
-            </div>
-            <div class="skip-setting-row">
-              <div class="skip-setting-label">
-                <a-switch v-model="skipOutroEnabled" size="small" />
-                <span>跳过片尾</span>
-              </div>
-              <div class="skip-setting-input">
-                <a-input-number 
-                  v-model="skipOutroSeconds" 
-                  :min="0" 
-                  :max="300" 
-                  :disabled="!skipOutroEnabled"
-                  size="small"
-                  style="width: 80px"
-                />
-                <span class="unit">秒</span>
-              </div>
-            </div>
-            <div class="skip-setting-tip">
-              <p>• 片头跳过：视频开始播放时自动跳过设定的秒数</p>
-              <p>• 片尾跳过：视频快结束时根据自动连播设置跳过片尾</p>
-            </div>
-          </div>
-          <div class="skip-settings-footer">
-            <button @click="saveSkipSettings" class="btn-save">保存</button>
-            <button @click="closeSkipSettingsDialog" class="btn-cancel">取消</button>
-          </div>
-        </div>
-      </div>
+      <!-- 使用SkipSettingsDialog组件 -->
+      <SkipSettingsDialog
+        :visible="showSkipSettingsDialog"
+        :skip-intro-enabled="skipIntroEnabled"
+        :skip-outro-enabled="skipOutroEnabled"
+        :skip-intro-seconds="skipIntroSeconds"
+        :skip-outro-seconds="skipOutroSeconds"
+        @close="closeSkipSettingsDialog"
+        @save="saveSkipSettings"
+      />
     </div>
   </a-card>
 </template>
@@ -151,6 +64,9 @@ import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import { IconClose } from '@arco-design/web-vue/es/icon'
 import Hls from 'hls.js'
+import PlayerHeader from './PlayerHeader.vue'
+import SkipSettingsDialog from './SkipSettingsDialog.vue'
+import { useSkipSettings } from '@/composables/useSkipSettings'
 
 // Props
 const props = defineProps({
@@ -198,30 +114,6 @@ const autoNextCountdown = ref(10)
 const countdownTimer = ref(null)
 const isProcessingAutoNext = ref(false) // 防止重复触发自动连播
 
-// 片头片尾跳过功能相关数据
-const showSkipSettingsDialog = ref(false)
-const skipIntroEnabled = ref(false)
-const skipOutroEnabled = ref(false)
-const skipIntroSeconds = ref(30)
-const skipOutroSeconds = ref(30)
-const skipIntroApplied = ref(false) // 标记片头跳过是否已应用
-const skipOutroTimer = ref(null) // 片尾跳过定时器
-
-// 计算属性：是否启用了任一跳过功能
-const skipEnabled = computed(() => {
-  return skipIntroEnabled.value || skipOutroEnabled.value
-})
-
-// 切换自动连播
-const toggleAutoNext = () => {
-  autoNext.value = !autoNext.value
-}
-
-// 切换倒计时显示
-const toggleCountdown = () => {
-  showCountdown.value = !showCountdown.value
-}
-
 // 检查是否有下一集
 const hasNextEpisode = () => {
   return props.episodes && props.episodes.length > 0 && 
@@ -234,6 +126,15 @@ const getNextEpisode = () => {
     return props.episodes[props.currentEpisodeIndex + 1]
   }
   return null
+}
+
+// 隐藏自动下一集对话框
+const hideAutoNextDialog = () => {
+  showAutoNextDialog.value = false
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+    countdownTimer.value = null
+  }
 }
 
 // 播放下一集
@@ -249,6 +150,42 @@ const playNextEpisode = () => {
   }
 }
 
+// 使用片头片尾跳过功能组合式函数
+const {
+  showSkipSettingsDialog,
+  skipIntroEnabled,
+  skipOutroEnabled,
+  skipIntroSeconds,
+  skipOutroSeconds,
+  skipEnabled,
+  initSkipSettings,
+  applySkipSettings,
+  handleTimeUpdate,
+  resetSkipState,
+  openSkipSettingsDialog,
+  closeSkipSettingsDialog,
+  saveSkipSettings: saveSkipSettingsComposable
+} = useSkipSettings({
+  onSkipToNext: playNextEpisode,
+  getCurrentTime: () => videoPlayer.value?.currentTime || 0,
+  setCurrentTime: (time) => {
+    if (videoPlayer.value) {
+      videoPlayer.value.currentTime = time
+    }
+  },
+  getDuration: () => videoPlayer.value?.duration || 0
+})
+
+// 切换自动连播
+const toggleAutoNext = () => {
+  autoNext.value = !autoNext.value
+}
+
+// 切换倒计时显示
+const toggleCountdown = () => {
+  showCountdown.value = !showCountdown.value
+}
+
 // 显示自动下一集对话框
 const showAutoNextDialogFunc = () => {
   if (!autoNext.value || !hasNextEpisode()) return
@@ -262,15 +199,6 @@ const showAutoNextDialogFunc = () => {
       playNextEpisode()
     }
   }, 1000)
-}
-
-// 隐藏自动下一集对话框
-const hideAutoNextDialog = () => {
-  showAutoNextDialog.value = false
-  if (countdownTimer.value) {
-    clearInterval(countdownTimer.value)
-    countdownTimer.value = null
-  }
 }
 
 // 取消自动下一集
@@ -331,15 +259,8 @@ const initVideoPlayer = (url) => {
   
   console.log('初始化视频播放器:', url)
   
-  // 重置片头跳过标记和片尾定时器
-  skipIntroApplied.value = false
-  if (skipOutroTimer.value) {
-    clearInterval(skipOutroTimer.value)
-    skipOutroTimer.value = null
-  }
-  
-  // 加载片头片尾设置
-  loadSkipSettings()
+  // 重置片头片尾跳过状态
+  resetSkipState()
   
   // 首先判断链接类型
   if (!isDirectVideoLink(url)) {
@@ -489,12 +410,14 @@ const initVideoPlayer = (url) => {
     video.removeEventListener('error', handleError)
     video.removeEventListener('loadstart', handleLoadStart)
     video.removeEventListener('timeupdate', handleTimeUpdate)
+    video.removeEventListener('ended', handleVideoEnded)
     
     // 添加新的事件监听器
     video.addEventListener('loadedmetadata', handleLoadedMetadata)
     video.addEventListener('error', handleError)
     video.addEventListener('loadstart', handleLoadStart)
     video.addEventListener('timeupdate', handleTimeUpdate)
+    video.addEventListener('ended', handleVideoEnded)
     
     // 开始加载视频
     video.load()
@@ -508,115 +431,14 @@ const initVideoPlayer = (url) => {
 // 片头片尾跳过功能相关方法
 
 // 关闭片头片尾设置弹窗
-const closeSkipSettingsDialog = () => {
-  showSkipSettingsDialog.value = false
-}
-
 // 保存片头片尾设置
-const saveSkipSettings = () => {
-  const settings = {
-    skipIntroEnabled: skipIntroEnabled.value,
-    skipOutroEnabled: skipOutroEnabled.value,
-    skipIntroSeconds: skipIntroSeconds.value,
-    skipOutroSeconds: skipOutroSeconds.value
-  }
-  
-  localStorage.setItem('videoSkipSettings', JSON.stringify(settings))
+const saveSkipSettings = (settings) => {
+  saveSkipSettingsComposable(settings)
   Message.success('片头片尾设置已保存')
   closeSkipSettingsDialog()
-  
-  // 应用新设置
-  applySkipSettings()
 }
 
-// 加载片头片尾设置
-const loadSkipSettings = () => {
-  try {
-    const saved = localStorage.getItem('videoSkipSettings')
-    if (saved) {
-      const settings = JSON.parse(saved)
-      skipIntroEnabled.value = settings.skipIntroEnabled || false
-      skipOutroEnabled.value = settings.skipOutroEnabled || false
-      skipIntroSeconds.value = settings.skipIntroSeconds || 30
-      skipOutroSeconds.value = settings.skipOutroSeconds || 30
-    }
-  } catch (error) {
-    console.error('加载片头片尾设置失败:', error)
-  }
-}
 
-// 应用片头片尾设置
-const applySkipSettings = () => {
-  if (!videoPlayer.value) return
-  
-  const video = videoPlayer.value
-  
-  // 应用片头跳过
-  if (skipIntroEnabled.value && skipIntroSeconds.value > 0 && !skipIntroApplied.value) {
-    if (video.currentTime < skipIntroSeconds.value) {
-      video.currentTime = skipIntroSeconds.value
-      skipIntroApplied.value = true
-      console.log(`跳过片头 ${skipIntroSeconds.value} 秒`)
-    }
-  }
-  
-  // 设置片尾跳过
-  if (skipOutroEnabled.value && skipOutroSeconds.value > 0) {
-    setupOutroSkip()
-  }
-}
-
-// 设置片尾跳过
-const setupOutroSkip = () => {
-  if (!videoPlayer.value || skipOutroTimer.value) return
-  
-  const video = videoPlayer.value
-  
-  const checkOutroSkip = () => {
-    if (!video.duration || !skipOutroEnabled.value) return
-    
-    const remainingTime = video.duration - video.currentTime
-    
-    // 如果剩余时间小于等于设定的片尾跳过时间，且开启了自动连播
-    if (remainingTime <= skipOutroSeconds.value && autoNext.value && hasNextEpisode()) {
-      console.log(`剩余时间 ${remainingTime.toFixed(1)} 秒，跳过片尾`)
-      
-      // 清理定时器
-      if (skipOutroTimer.value) {
-        clearInterval(skipOutroTimer.value)
-        skipOutroTimer.value = null
-      }
-      
-      // 触发自动下一集
-      if (showCountdown.value) {
-        showAutoNextDialogFunc()
-      } else {
-        setTimeout(() => {
-          playNextEpisode()
-        }, 500)
-      }
-    }
-  }
-  
-  // 每秒检查一次
-  skipOutroTimer.value = setInterval(checkOutroSkip, 1000)
-}
-
-// 处理视频时间更新事件
-const handleTimeUpdate = () => {
-  if (!videoPlayer.value) return
-  
-  const video = videoPlayer.value
-  
-  // 检查片头跳过
-  if (skipIntroEnabled.value && skipIntroSeconds.value > 0 && !skipIntroApplied.value) {
-    if (video.currentTime < skipIntroSeconds.value && video.currentTime > 0) {
-      video.currentTime = skipIntroSeconds.value
-      skipIntroApplied.value = true
-      console.log(`跳过片头 ${skipIntroSeconds.value} 秒`)
-    }
-  }
-}
 
 // 关闭播放器
 const closePlayer = () => {
@@ -672,6 +494,11 @@ watch(() => props.visible, (newVisible) => {
   }
 })
 
+// 组件挂载时初始化
+onMounted(() => {
+  initSkipSettings()
+})
+
 // 组件卸载时清理资源
 onUnmounted(() => {
   console.log('VideoPlayer组件卸载，清理播放器资源')
@@ -692,12 +519,6 @@ onUnmounted(() => {
   if (countdownTimer.value) {
     clearInterval(countdownTimer.value)
     countdownTimer.value = null
-  }
-  
-  // 清理片尾跳过定时器
-  if (skipOutroTimer.value) {
-    clearInterval(skipOutroTimer.value)
-    skipOutroTimer.value = null
   }
 })
 </script>
@@ -914,165 +735,7 @@ onUnmounted(() => {
   background: #555;
 }
 
-/* 片头片尾设置弹窗样式 */
-.skip-settings-dialog {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
-.skip-settings-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-}
-
-.skip-settings-content {
-  position: relative;
-  background: white;
-  border-radius: 12px;
-  width: 400px;
-  max-width: 90vw;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
-}
-
-.skip-settings-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
-}
-
-.skip-settings-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.skip-close-btn {
-  background: none;
-  border: none;
-  font-size: 20px;
-  color: #666;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.skip-close-btn:hover {
-  background: #e9ecef;
-  color: #333;
-}
-
-.skip-settings-body {
-  padding: 20px;
-}
-
-.skip-setting-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.skip-setting-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #333;
-}
-
-.skip-setting-input {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.skip-setting-input .unit {
-  font-size: 12px;
-  color: #666;
-}
-
-.skip-setting-tip {
-  margin-top: 16px;
-  padding: 12px;
-  background: #f8f9fa;
-  border-radius: 6px;
-  border-left: 3px solid #1890ff;
-}
-
-.skip-setting-tip p {
-  margin: 0;
-  font-size: 12px;
-  color: #666;
-  line-height: 1.5;
-}
-
-.skip-setting-tip p + p {
-  margin-top: 4px;
-}
-
-.skip-settings-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 16px 20px;
-  background: #f8f9fa;
-  border-top: 1px solid #e9ecef;
-}
-
-.btn-save {
-  padding: 6px 16px;
-  background: #1890ff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
-}
-
-.btn-save:hover {
-  background: #40a9ff;
-}
-
-.skip-settings-footer .btn-cancel {
-  padding: 6px 16px;
-  background: #f5f5f5;
-  color: #666;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
-}
-
-.skip-settings-footer .btn-cancel:hover {
-  background: #e6f7ff;
-  border-color: #91d5ff;
-  color: #1890ff;
-}
 
 /* 响应式设计 */
 @media (max-width: 768px) {
@@ -1088,16 +751,6 @@ onUnmounted(() => {
 
   .video-player {
     min-height: 200px;
-  }
-  
-  .skip-settings-content {
-    width: 350px;
-  }
-  
-  .skip-setting-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
   }
 }
 </style>

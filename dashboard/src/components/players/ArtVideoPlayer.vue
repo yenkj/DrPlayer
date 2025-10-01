@@ -1,63 +1,18 @@
 <template>
   <a-card v-if="visible && videoUrl" class="art-video-player-section">
-    <div class="player-header">
-      <h3>正在播放: {{ episodeName }}</h3>
-      <div class="player-controls">
-
-        
-        <div class="compact-button-group">
-          <div class="compact-btn" @click="toggleAutoNext" :class="{ active: autoNextEnabled }" v-if="props.episodes.length > 1">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8 5v14l11-7z" fill="currentColor"/>
-            </svg>
-            <span class="btn-text">自动连播</span>
-          </div>
-          
-          <div class="compact-btn" @click="toggleCountdown" :class="{ active: countdownEnabled }" v-if="props.episodes.length > 1">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-              <polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <span class="btn-text">倒计时</span>
-          </div>
-          
-          <div class="compact-btn selector-btn">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
-              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <a-select
-              :model-value="playerType"
-              @change="handlePlayerTypeChange"
-              class="compact-select"
-              size="small"
-            >
-              <a-option value="default">默认播放器</a-option>
-              <a-option value="artplayer">ArtPlayer</a-option>
-            </a-select>
-          </div>
-          
-          <div class="compact-btn" :class="{ active: skipEnabled }" @click="showSkipSettingsDialog = true">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M5 4l10 8-10 8V4z" fill="currentColor"/>
-              <path d="M19 5v14" stroke="currentColor" stroke-width="2"/>
-              <path d="M3 12h2" stroke="currentColor" stroke-width="2"/>
-              <path d="M19 12h2" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <span class="btn-text">片头片尾</span>
-          </div>
-          
-          <div class="compact-btn close-btn" @click="closePlayer">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
-              <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <span class="btn-text">关闭</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <PlayerHeader
+      :episode-name="episodeName"
+      :player-type="playerType"
+      :episodes="episodes"
+      :auto-next-enabled="autoNextEnabled"
+      :countdown-enabled="countdownEnabled"
+      :skip-enabled="skipEnabled"
+      @toggle-auto-next="toggleAutoNext"
+      @toggle-countdown="toggleCountdown"
+      @player-change="handlePlayerTypeChange"
+      @open-skip-settings="openSkipSettingsDialog"
+      @close="closePlayer"
+    />
     <div class="art-player-wrapper" v-show="props.visible">
     
     <div ref="artPlayerContainer" class="art-player-container">
@@ -107,57 +62,15 @@
     </div>
     
     <!-- 片头片尾设置弹窗 -->
-    <div v-if="showSkipSettingsDialog" class="skip-settings-dialog">
-      <div class="skip-settings-overlay" @click="closeSkipSettingsDialog"></div>
-      <div class="skip-settings-content">
-        <div class="skip-settings-header">
-          <h3>片头片尾设置</h3>
-          <button @click="closeSkipSettingsDialog" class="skip-settings-close-btn">×</button>
-        </div>
-        <div class="skip-settings-body">
-          <div class="skip-setting-row">
-            <div class="skip-setting-label">
-              <a-switch v-model="skipIntroEnabled" />
-              <span>跳过片头</span>
-            </div>
-            <div class="skip-setting-input">
-              <a-input-number 
-                v-model="skipIntroSeconds" 
-                :min="0" 
-                :max="300" 
-                :disabled="!skipIntroEnabled"
-                placeholder="秒数"
-              />
-              <span class="unit">秒</span>
-            </div>
-          </div>
-          <div class="skip-setting-row">
-            <div class="skip-setting-label">
-              <a-switch v-model="skipOutroEnabled" />
-              <span>跳过片尾</span>
-            </div>
-            <div class="skip-setting-input">
-              <a-input-number 
-                v-model="skipOutroSeconds" 
-                :min="0" 
-                :max="300" 
-                :disabled="!skipOutroEnabled"
-                placeholder="秒数"
-              />
-              <span class="unit">秒</span>
-            </div>
-          </div>
-          <div class="skip-setting-tip">
-            <p>• 片头跳过：播放开始时自动跳过指定时长</p>
-            <p>• 片尾跳过：视频结束前指定时长时自动切换下一集（需开启自动连播）</p>
-          </div>
-        </div>
-        <div class="skip-settings-footer">
-          <a-button @click="closeSkipSettingsDialog">取消</a-button>
-          <a-button type="primary" @click="saveSkipSettings">保存</a-button>
-        </div>
-      </div>
-    </div>
+    <SkipSettingsDialog
+      :visible="showSkipSettingsDialog"
+      :skip-intro-enabled="skipIntroEnabled"
+      :skip-outro-enabled="skipOutroEnabled"
+      :skip-intro-seconds="skipIntroSeconds"
+      :skip-outro-seconds="skipOutroSeconds"
+      @close="closeSkipSettingsDialog"
+      @save="saveSkipSettings"
+    />
   </div>
   </a-card>
 </template>
@@ -168,6 +81,9 @@ import { Message } from '@arco-design/web-vue'
 import { IconClose } from '@arco-design/web-vue/es/icon'
 import Artplayer from 'artplayer'
 import Hls from 'hls.js'
+import PlayerHeader from './PlayerHeader.vue'
+import SkipSettingsDialog from './SkipSettingsDialog.vue'
+import { useSkipSettings } from '@/composables/useSkipSettings'
 
 // Props - 已添加 HLS 支持、动态高度自适应和自动下一集功能
 const props = defineProps({
@@ -229,17 +145,34 @@ const showEpisodeDialog = ref(false) // 显示选集弹窗
 const episodeListRef = ref(null) // 选集列表容器引用
 const currentEpisodeRef = ref(null) // 当前选集按钮引用
 
-// 片头片尾跳过功能相关数据
-const showSkipSettingsDialog = ref(false) // 显示片头片尾设置弹窗
-const skipIntroEnabled = ref(false) // 片头跳过开关
-const skipOutroEnabled = ref(false) // 片尾跳过开关
-const skipIntroSeconds = ref(90) // 片头跳过秒数
-const skipOutroSeconds = ref(90) // 片尾跳过秒数
-const skipIntroApplied = ref(false) // 片头跳过是否已应用
-const skipOutroTimer = ref(null) // 片尾跳过定时器
-
-// 计算属性
-const skipEnabled = computed(() => skipIntroEnabled.value || skipOutroEnabled.value)
+// 使用片头片尾设置组合式函数
+const {
+  showSkipSettingsDialog,
+  skipIntroEnabled,
+  skipOutroEnabled,
+  skipIntroSeconds,
+  skipOutroSeconds,
+  skipEnabled,
+  initSkipSettings,
+  resetSkipState,
+  applySkipSettings,
+  handleTimeUpdate,
+  closeSkipSettingsDialog,
+  saveSkipSettings: saveSkipSettingsComposable
+} = useSkipSettings({
+  onSkipToNext: () => {
+    if (autoNextEnabled.value && hasNextEpisode()) {
+      playNextEpisode()
+    }
+  },
+  getCurrentTime: () => artPlayerInstance.value?.video?.currentTime || 0,
+  setCurrentTime: (time) => {
+    if (artPlayerInstance.value?.video) {
+      artPlayerInstance.value.video.currentTime = time
+    }
+  },
+  getDuration: () => artPlayerInstance.value?.video?.duration || 0
+})
 
 // 链接类型判断函数
 const isDirectVideoLink = (url) => {
@@ -295,15 +228,8 @@ const initArtPlayer = async (url) => {
   // 重置重连状态
   resetRetryState()
   
-  // 重置片头跳过标记和片尾定时器
-  skipIntroApplied.value = false
-  if (skipOutroTimer.value) {
-    clearInterval(skipOutroTimer.value)
-    skipOutroTimer.value = null
-  }
-  
-  // 加载片头片尾设置
-  loadSkipSettings()
+  // 重置片头片尾状态
+  resetSkipState()
   
   // 等待 DOM 更新后计算动态高度
   await nextTick()
@@ -496,6 +422,10 @@ const initArtPlayer = async (url) => {
       applySkipSettings()
     })
 
+    art.on('video:timeupdate', () => {
+      handleTimeUpdate()
+    })
+
     art.on('video:playing', () => {
       console.log('视频开始播放')
       // 视频开始播放时，重置重连计数器
@@ -550,12 +480,6 @@ const closePlayer = () => {
   // 重置重连状态
   resetRetryState()
   
-  // 清理片尾跳过定时器
-  if (skipOutroTimer.value) {
-    clearInterval(skipOutroTimer.value)
-    skipOutroTimer.value = null
-  }
-  
   // 清理播放器实例
   if (artPlayerInstance.value) {
     // 清理 HLS 实例
@@ -571,110 +495,23 @@ const closePlayer = () => {
   emit('close')
 }
 
-// 片头片尾跳过功能相关方法
-// 关闭片头片尾设置弹窗
-const closeSkipSettingsDialog = () => {
-  showSkipSettingsDialog.value = false
-}
 
-// 保存片头片尾设置
-const saveSkipSettings = () => {
-  const settings = {
-    skipIntroEnabled: skipIntroEnabled.value,
-    skipOutroEnabled: skipOutroEnabled.value,
-    skipIntroSeconds: skipIntroSeconds.value,
-    skipOutroSeconds: skipOutroSeconds.value
-  }
-  
-  localStorage.setItem('videoPlayerSkipSettings', JSON.stringify(settings))
-  console.log('片头片尾设置已保存:', settings)
-  
-  closeSkipSettingsDialog()
-  
-  // 重新应用设置
-  applySkipSettings()
-  
-  Message.success('设置已保存')
-}
-
-// 加载片头片尾设置
-const loadSkipSettings = () => {
-  try {
-    const savedSettings = localStorage.getItem('videoPlayerSkipSettings')
-    if (savedSettings) {
-      const settings = JSON.parse(savedSettings)
-      skipIntroEnabled.value = settings.skipIntroEnabled || false
-      skipOutroEnabled.value = settings.skipOutroEnabled || false
-      skipIntroSeconds.value = settings.skipIntroSeconds || 90
-      skipOutroSeconds.value = settings.skipOutroSeconds || 90
-      console.log('已加载片头片尾设置:', settings)
-    }
-  } catch (error) {
-    console.error('加载片头片尾设置失败:', error)
-  }
-}
-
-// 应用片头片尾设置
-const applySkipSettings = () => {
-  if (!artPlayerInstance.value) return
-  
-  // 应用片头跳过
-  if (skipIntroEnabled.value && skipIntroSeconds.value > 0 && !skipIntroApplied.value) {
-    const currentTime = artPlayerInstance.value.currentTime
-    if (currentTime < skipIntroSeconds.value) {
-      artPlayerInstance.value.currentTime = skipIntroSeconds.value
-      skipIntroApplied.value = true
-      console.log(`已跳过片头 ${skipIntroSeconds.value} 秒`)
-      Message.info(`已跳过片头 ${skipIntroSeconds.value} 秒`)
-    }
-  }
-  
-  // 设置片尾跳过
-  if (skipOutroEnabled.value && skipOutroSeconds.value > 0) {
-    setupOutroSkip()
-  }
-}
-
-// 设置片尾跳过
-const setupOutroSkip = () => {
-  if (!artPlayerInstance.value || !autoNextEnabled.value) return
-  
-  // 清除之前的定时器
-  if (skipOutroTimer.value) {
-    clearInterval(skipOutroTimer.value)
-    skipOutroTimer.value = null
-  }
-  
-  // 监听时间更新
-  const handleTimeUpdate = () => {
-    if (!artPlayerInstance.value) return
-    
-    const currentTime = artPlayerInstance.value.currentTime
-    const duration = artPlayerInstance.value.duration
-    
-    if (duration > 0 && currentTime > 0) {
-      const remainingTime = duration - currentTime
-      
-      // 当剩余时间小于等于设置的片尾跳过时间时，自动切换下一集
-      if (remainingTime <= skipOutroSeconds.value && hasNextEpisode()) {
-        console.log(`剩余时间 ${remainingTime.toFixed(1)} 秒，触发片尾跳过`)
-        
-        // 移除事件监听器，避免重复触发
-        artPlayerInstance.value.off('video:timeupdate', handleTimeUpdate)
-        
-        // 直接播放下一集，不显示倒计时
-        playNextEpisode()
-      }
-    }
-  }
-  
-  // 添加时间更新监听器
-  artPlayerInstance.value.on('video:timeupdate', handleTimeUpdate)
-}
 
 // 处理播放器类型变更
 const handlePlayerTypeChange = (newType) => {
   emit('player-change', newType)
+}
+
+// 打开片头片尾设置弹窗
+const openSkipSettingsDialog = () => {
+  showSkipSettingsDialog.value = true
+}
+
+// 保存片头片尾设置
+const saveSkipSettings = (settings) => {
+  saveSkipSettingsComposable(settings)
+  Message.success('片头片尾设置已保存')
+  closeSkipSettingsDialog()
 }
 
 // 处理重连逻辑
@@ -950,6 +787,8 @@ onMounted(() => {
   console.log('ArtVideoPlayer 组件已挂载 - 动态高度版本')
   // 添加窗口大小变化监听
   window.addEventListener('resize', handleResize)
+  // 初始化片头片尾设置
+  initSkipSettings()
 })
 
 // 组件卸载时清理资源
@@ -1374,166 +1213,5 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-/* 片头片尾设置弹窗样式 */
-.skip-settings-dialog {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
-.skip-settings-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-}
-
-.skip-settings-content {
-  position: relative;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-  max-width: 500px;
-  width: 90%;
-  overflow: hidden;
-  animation: skipSettingsShow 0.3s ease-out;
-}
-
-@keyframes skipSettingsShow {
-  from {
-    opacity: 0;
-    transform: scale(0.9) translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.skip-settings-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e8e8e8;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-}
-
-.skip-settings-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.skip-settings-close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s ease;
-}
-
-.skip-settings-close-btn:hover {
-  background: rgba(0, 0, 0, 0.1);
-  color: #333;
-}
-
-.skip-settings-body {
-  padding: 24px;
-}
-
-.skip-setting-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding: 16px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-}
-
-.skip-setting-label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #495057;
-}
-
-.skip-setting-input {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.skip-setting-input .unit {
-  font-size: 14px;
-  color: #6c757d;
-}
-
-.skip-setting-tip {
-  margin-top: 16px;
-  padding: 16px;
-  background: #e3f2fd;
-  border-radius: 8px;
-  border-left: 4px solid #2196f3;
-}
-
-.skip-setting-tip p {
-  margin: 0 0 8px 0;
-  font-size: 13px;
-  color: #1565c0;
-  line-height: 1.5;
-}
-
-.skip-setting-tip p:last-child {
-  margin-bottom: 0;
-}
-
-.skip-settings-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 24px;
-  border-top: 1px solid #e8e8e8;
-  background: #f8f9fa;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .skip-settings-content {
-    max-width: 95%;
-    margin: 20px;
-  }
-  
-  .skip-setting-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  
-  .skip-setting-input {
-    width: 100%;
-    justify-content: flex-end;
-  }
-}
 </style>
