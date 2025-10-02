@@ -218,15 +218,7 @@
           {{ parseDialogConfig.message }}
         </div>
         
-        <!-- 嗅探进度显示 -->
-        <div v-if="sniffing" class="sniff-progress">
-          <div class="progress-icon">
-            <a-spin :size="16" />
-          </div>
-          <div class="progress-text">
-            {{ sniffProgress }}
-          </div>
-        </div>
+
         
         <!-- 嗅探结果显示 -->
         <div v-if="sniffResults.length > 0" class="sniff-results">
@@ -249,7 +241,7 @@
           </div>
         </div>
         
-        <div v-if="!sniffing && parseDialogConfig.type !== 'sniff'" class="parse-hint">
+        <div v-if="!sniffing" class="parse-hint">
           <div class="hint-icon">
             <icon-eye />
           </div>
@@ -356,7 +348,6 @@ const parseDialogConfig = ref({
 
 // 嗅探相关
 const sniffing = ref(false)
-const sniffProgress = ref('')
 const sniffResults = ref([])
 
 // 从localStorage读取用户的播放器偏好，默认为'default'
@@ -1062,13 +1053,8 @@ const selectEpisode = async (index) => {
          // 执行嗅探，传递原始的T4数据（parseResult.data）
          const sniffSuccess = await sniffVideoUrl(parseResult.data)
          if (!sniffSuccess) {
-           // 嗅探失败，显示错误信息
-           parseDialogConfig.value = {
-             title: '嗅探失败',
-             message: sniffProgress.value || '嗅探视频链接失败，请检查嗅探器配置或稍后重试。',
-             type: 'sniff'
-           }
-           showParseDialog.value = true
+           // 嗅探失败，已在sniffVideoUrl函数中通过Message.error显示错误信息
+           // 不需要额外的弹窗处理
          }
        }
      } else if (parseResult.playType === 'parse') {
@@ -1150,6 +1136,8 @@ const selectEpisode = async (index) => {
 
 // 嗅探视频链接
 const sniffVideoUrl = async (parseDataOrUrl) => {
+  let loadingMessage = null
+  
   try {
     // 检查嗅探功能是否启用
     if (!isSnifferEnabled()) {
@@ -1157,8 +1145,13 @@ const sniffVideoUrl = async (parseDataOrUrl) => {
     }
 
     sniffing.value = true
-    sniffProgress.value = '正在启动嗅探器，请稍等...'
     sniffResults.value = []
+    
+    // 使用全局消息提示，设置duration为0让消息持续显示直到手动关闭
+    loadingMessage = Message.info({
+      content: '正在全力嗅探中，请稍等...',
+      duration: 0
+    })
 
     console.log('开始嗅探视频链接:', parseDataOrUrl)
     
@@ -1167,12 +1160,10 @@ const sniffVideoUrl = async (parseDataOrUrl) => {
     if (typeof parseDataOrUrl === 'object' && parseDataOrUrl.parse === 1) {
       // T4解析数据格式，直接使用
       sniffData = parseDataOrUrl
-      sniffProgress.value = '正在全力嗅探中，请稍等...'
       console.log('使用T4解析数据进行嗅探:', sniffData)
     } else {
       // 普通URL格式
       sniffData = typeof parseDataOrUrl === 'string' ? parseDataOrUrl : parseDataOrUrl.toString()
-      sniffProgress.value = '正在全力嗅探中，请稍等...'
       console.log('使用普通URL进行嗅探:', sniffData)
     }
 
@@ -1206,7 +1197,8 @@ const sniffVideoUrl = async (parseDataOrUrl) => {
         throw new Error('嗅探结果格式无效')
       }
       
-      sniffProgress.value = `嗅探完成，找到 ${videoCount} 个视频链接`
+      // 关闭loading消息
+      loadingMessage.close()
       
       // 自动选择第一个链接进行播放
       const firstVideo = videoData[0]
@@ -1230,7 +1222,10 @@ const sniffVideoUrl = async (parseDataOrUrl) => {
 
   } catch (error) {
     console.error('嗅探失败:', error)
-    sniffProgress.value = `嗅探失败: ${error.message}`
+    // 关闭loading消息（如果存在）
+    if (loadingMessage) {
+      loadingMessage.close()
+    }
     Message.error(`嗅探失败: ${error.message}`)
     return false
   } finally {

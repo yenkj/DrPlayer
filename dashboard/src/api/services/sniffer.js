@@ -16,7 +16,7 @@
 export const sniffVideo = async (urlOrParseData, options = {}) => {
   const {
     snifferUrl = 'http://localhost:57573/sniffer',
-    timeout = 15,
+    timeout = 10,
     mode = '0',
     is_pc = '0'
   } = options
@@ -149,7 +149,7 @@ export const getSnifferConfig = () => {
       return {
         enabled: parsed.proxySniffEnabled || false,
         url: parsed.proxySniff || 'http://localhost:57573/sniffer',
-        timeout: parsed.snifferTimeout || 15
+        timeout: parsed.snifferTimeout || 10
       }
     }
   } catch (error) {
@@ -160,17 +160,39 @@ export const getSnifferConfig = () => {
   return {
     enabled: false,
     url: 'http://localhost:57573/sniffer',
-    timeout: 15
+    timeout: 10
   }
 }
 
 /**
- * 检查是否启用嗅探功能
- * @returns {boolean} 是否启用嗅探
+ * 检查嗅探器是否启用
+ * @returns {boolean} 是否启用
  */
 export const isSnifferEnabled = () => {
   const config = getSnifferConfig()
-  return config.enabled && config.url
+  
+  // 检查URL是否有效
+  const hasValidUrl = config.url && config.url.trim() !== '' && config.url !== 'undefined'
+  
+  if (!hasValidUrl) {
+    return false
+  }
+  
+  // 检查是否有保存的设置
+  try {
+    const savedAddresses = localStorage.getItem('addressSettings')
+    if (savedAddresses) {
+      const parsed = JSON.parse(savedAddresses)
+      // 如果用户明确保存了设置，使用保存的enabled状态
+      return parsed.proxySniffEnabled === true
+    }
+  } catch (error) {
+    console.error('检查嗅探器配置失败:', error)
+  }
+  
+  // 如果没有保存的设置，但有有效的URL（包括默认URL），认为嗅探可用
+  // 这样可以处理用户打开开关但未保存设置的情况
+  return true
 }
 
 /**

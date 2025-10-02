@@ -832,7 +832,7 @@ const addressSettings = reactive({
   proxyPlayEnabled: false,
   proxySniff: 'http://localhost:57573/sniffer',
   proxySniffEnabled: false,
-  snifferTimeout: 15
+  snifferTimeout: 10
 })
 
 const addressSaving = reactive({
@@ -888,8 +888,20 @@ const playerSelectVisible = ref(false)
 const saveAddress = async (configType) => {
   const addressValue = addressSettings[configType]
   
-  if (!addressValue || !addressValue.trim()) {
-    Message.warning('请输入地址')
+  // 对于字符串类型，检查是否为空或只包含空白字符
+  // 对于数字类型，检查是否为有效数字
+  if (typeof addressValue === 'string') {
+    if (!addressValue || !addressValue.trim()) {
+      Message.warning('请输入地址')
+      return
+    }
+  } else if (typeof addressValue === 'number') {
+    if (isNaN(addressValue) || addressValue <= 0) {
+      Message.warning('请输入有效的数值')
+      return
+    }
+  } else {
+    Message.warning('请输入有效的配置值')
     return
   }
   
@@ -1306,7 +1318,7 @@ const loadConfig = async () => {
         }
         // 确保嗅探超时有默认值
         if (!addressSettings.snifferTimeout) {
-          addressSettings.snifferTimeout = 15
+          addressSettings.snifferTimeout = 10
         }
       } catch (error) {
         console.error('Failed to load address settings:', error)
