@@ -196,15 +196,21 @@ const loadProxyConfig = () => {
     // 先加载历史记录
     loadProxyHistory()
     
+    // 如果启用了代理播放且有配置地址
     if (proxyPlayEnabled && proxyPlay) {
       // 检查当前配置的代理是否已在历史记录中
-      const exists = proxyOptions.value.some(option => option.url === proxyPlay)
-      if (!exists) {
-        // 如果不在历史记录中，添加到选项列表
+      const existingIndex = proxyOptions.value.findIndex(option => option.url === proxyPlay)
+      
+      if (existingIndex !== -1) {
+        // 如果在历史记录中，将其移到最前面
+        const currentOption = proxyOptions.value.splice(existingIndex, 1)[0]
+        proxyOptions.value.unshift(currentOption)
+      } else {
+        // 如果不在历史记录中，添加到最前面
         const proxyName = getProxyName(proxyPlay)
         proxyOptions.value.unshift({
           value: proxyPlay,
-          label: proxyName,
+          label: `${proxyName} (当前)`,
           url: proxyPlay
         })
       }
@@ -215,6 +221,13 @@ const loadProxyConfig = () => {
       // 如果代理播放开关关闭，默认选择关闭
       currentProxyOption.value = 'disabled'
     }
+    
+    console.log('代理播放配置加载完成:', {
+      enabled: proxyPlayEnabled,
+      current: proxyPlay,
+      optionsCount: proxyOptions.value.length,
+      selected: currentProxyOption.value
+    })
   } catch (error) {
     console.error('加载代理播放配置失败:', error)
     currentProxyOption.value = 'disabled'
@@ -224,20 +237,27 @@ const loadProxyConfig = () => {
 // 加载代理播放地址历史记录
 const loadProxyHistory = () => {
   try {
-    const history = JSON.parse(localStorage.getItem('proxy-play-history') || '[]')
+    // 只从设置界面的存储位置加载
+    const addressHistoryKey = 'address-history-proxy-play'
+    const addressHistory = JSON.parse(localStorage.getItem(addressHistoryKey) || '[]')
     
-    // 添加历史记录到选项中（去重）
-    history.forEach(item => {
-      const exists = proxyOptions.value.some(option => option.url === item.url)
+    // 添加历史记录到选项中
+    addressHistory.forEach(item => {
+      const url = item.url || item.value || ''
+      if (!url) return
+      
+      const exists = proxyOptions.value.some(option => option.url === url)
       if (!exists) {
-        const proxyName = getProxyName(item.url)
+        const proxyName = getProxyName(url)
         proxyOptions.value.push({
-          value: item.url,
+          value: url,
           label: proxyName,
-          url: item.url
+          url: url
         })
       }
     })
+    
+    console.log('已加载代理播放历史记录:', proxyOptions.value.length, '个选项')
   } catch (error) {
     console.error('加载代理播放历史记录失败:', error)
   }
@@ -248,30 +268,35 @@ const saveToProxyHistory = (url) => {
   if (!url || url === 'disabled') return
   
   try {
-    const history = JSON.parse(localStorage.getItem('proxy-play-history') || '[]')
     const proxyName = getProxyName(url)
+    const timestamp = Date.now()
+    
+    // 只保存到设置界面使用的存储位置
+    const addressHistoryKey = 'address-history-proxy-play'
+    const addressHistory = JSON.parse(localStorage.getItem(addressHistoryKey) || '[]')
     
     // 检查是否已存在
-    const existingIndex = history.findIndex(item => item.url === url)
+    const existingIndex = addressHistory.findIndex(item => item.url === url)
     
     if (existingIndex !== -1) {
       // 如果存在，移到最前面
-      history.splice(existingIndex, 1)
+      addressHistory.splice(existingIndex, 1)
     }
     
     // 添加到最前面
-    history.unshift({
+    addressHistory.unshift({
       url: url,
-      name: proxyName,
-      timestamp: Date.now()
+      timestamp: timestamp
     })
     
     // 限制历史记录数量（最多保存10个）
-    if (history.length > 10) {
-      history.splice(10)
+    if (addressHistory.length > 10) {
+      addressHistory.splice(10)
     }
     
-    localStorage.setItem('proxy-play-history', JSON.stringify(history))
+    localStorage.setItem(addressHistoryKey, JSON.stringify(addressHistory))
+    
+    console.log('已保存代理播放地址到历史记录:', url)
   } catch (error) {
     console.error('保存代理播放历史记录失败:', error)
   }

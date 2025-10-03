@@ -53,11 +53,13 @@ export function buildProxyPlayUrl(originalUrl, proxyAddress, headers = {}) {
     // 对 URL 和 headers 进行 URL 安全的 base64 编码
     const encodedUrl = base64Encode(originalUrl)
     const encodedHeaders = base64Encode(headersJson)
+    const encodedType = originalUrl.split('/').slice(-1)[0].split('?')[0]
 
     // 替换模板字符串中的${url}和${headers}
     let proxyUrl = cleanProxyAddress
       .replace(/\$\{url\}/g, encodedUrl)
       .replace(/\$\{headers\}/g, encodedHeaders)
+      .replace(/\$\{type\}/g, encodedType)
 
     console.log('🔄 [代理播放] 构建代理URL:')
     console.log('📺 原始地址:', originalUrl)
