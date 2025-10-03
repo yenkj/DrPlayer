@@ -309,10 +309,10 @@
       @ok="handleLoadConfig"
       @cancel="showConfigDialog = false"
     >
-      <a-form layout="vertical">
+      <a-form :model="configForm" layout="vertical">
         <a-form-item label="配置地址">
           <a-input
-            v-model="configUrl"
+            v-model="configForm.url"
             placeholder="请输入配置地址"
           />
           <template #extra>
@@ -332,9 +332,9 @@
       :footer="false"
     >
       <div class="batch-test-content">
-        <a-form layout="vertical">
+        <a-form :model="batchTestForm" layout="vertical">
           <a-form-item label="测试视频地址">
-            <a-select v-model="testVideoUrl" placeholder="选择或输入测试视频地址">
+            <a-select v-model="batchTestForm.videoUrl" placeholder="选择或输入测试视频地址">
               <a-option value="https://v.qq.com/x/cover/mzc00200mp8vo9b.html">腾讯视频示例</a-option>
               <a-option value="https://www.iqiyi.com/v_19rr7aqk5o.html">爱奇艺示例</a-option>
               <a-option value="https://v.youku.com/v_show/id_XNDkxMjQ4NjA4MA==.html">优酷示例</a-option>
@@ -411,8 +411,6 @@ const testingParsers = ref(new Set())
 const testResults = ref({})
 const batchTesting = ref(false)
 const batchTestResults = ref([])
-const testVideoUrl = ref('https://v.qq.com/x/cover/mzc00200mp8vo9b.html')
-const configUrl = ref('')
 const uploadRef = ref(null)
 const importFile = ref(null)
 
@@ -423,6 +421,14 @@ const parserForm = ref({
   type: '0',
   flags: [],
   headerJson: ''
+})
+
+const configForm = ref({
+  url: ''
+})
+
+const batchTestForm = ref({
+  videoUrl: 'https://v.qq.com/x/cover/mzc00200mp8vo9b.html'
 })
 
 // 用于拖拽的响应式数据
@@ -489,7 +495,7 @@ const testParser = async (parser) => {
   testingParsers.value.add(parser.id)
   
   try {
-    const result = await parserStore.testParser(parser, testVideoUrl.value)
+    const result = await parserStore.testParser(parser, batchTestForm.value.videoUrl)
     testResults.value[parser.id] = result
     
     Message[result.success ? 'success' : 'error'](result.message)
@@ -586,21 +592,21 @@ const handleImport = async () => {
 }
 
 const handleLoadConfig = async () => {
-  if (!configUrl.value) {
+  if (!configForm.value.url) {
     Message.error('请输入配置地址')
     return
   }
   
-  const success = await parserStore.loadParsersFromConfig(configUrl.value)
+  const success = await parserStore.loadParsersFromConfig(configForm.value.url)
   if (success) {
     Message.success('配置加载成功')
     showConfigDialog.value = false
-    configUrl.value = ''
+    configForm.value.url = ''
   }
 }
 
 const startBatchTest = async () => {
-  if (!testVideoUrl.value) {
+  if (!batchTestForm.value.videoUrl) {
     Message.error('请输入测试视频地址')
     return
   }
@@ -610,7 +616,7 @@ const startBatchTest = async () => {
   
   for (const parser of parserStore.enabledParsers) {
     try {
-      const result = await parserStore.testParser(parser, testVideoUrl.value)
+      const result = await parserStore.testParser(parser, batchTestForm.value.videoUrl)
       batchTestResults.value.push({
         id: parser.id,
         name: parser.name,
