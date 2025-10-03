@@ -44,6 +44,30 @@
           <span class="btn-text">倒计时</span>
         </div>
         
+        <!-- 代理播放地址选择器 -->
+        <div class="compact-btn selector-btn">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <a-select
+            :model-value="currentProxyOption"
+            @change="handleProxyChange"
+            class="compact-select"
+            size="small"
+          >
+            <a-option value="disabled">代理播放:关闭</a-option>
+            <a-option 
+              v-for="option in proxyOptions" 
+              :key="option.value" 
+              :value="option.value"
+            >
+              代理播放:{{ option.label }}
+            </a-option>
+          </a-select>
+        </div>
+
         <!-- 播放器切换选择器 -->
         <div class="compact-btn selector-btn">
           <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -91,6 +115,8 @@
 </template>
 
 <script setup>
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+
 // Props
 const props = defineProps({
   episodeName: {
@@ -132,14 +158,162 @@ const props = defineProps({
 })
 
 // Emits
-defineEmits([
+const emit = defineEmits([
   'toggle-auto-next',
   'toggle-countdown', 
   'player-change',
   'open-skip-settings',
   'toggle-debug',
-  'close'
+  'close',
+  'proxy-change'
 ])
+
+// 代理播放地址相关状态
+const currentProxyOption = ref('disabled')
+const proxyOptions = ref([])
+
+// 获取代理播放地址配置名称
+const getProxyName = (url) => {
+  if (!url) return '未知'
+  const hashIndex = url.indexOf('#')
+  if (hashIndex !== -1 && hashIndex < url.length - 1) {
+    return url.substring(hashIndex + 1)
+  }
+  return '默认代理'
+}
+
+// 加载代理播放地址配置
+const loadProxyConfig = () => {
+  try {
+    // 从设置中获取代理播放配置
+    const savedAddresses = JSON.parse(localStorage.getItem('addressSettings') || '{}')
+    const proxyPlayEnabled = savedAddresses.proxyPlayEnabled || false
+    const proxyPlay = savedAddresses.proxyPlay || ''
+    
+    // 清空选项
+    proxyOptions.value = []
+    
+    // 先加载历史记录
+    loadProxyHistory()
+    
+    if (proxyPlayEnabled && proxyPlay) {
+      // 检查当前配置的代理是否已在历史记录中
+      const exists = proxyOptions.value.some(option => option.url === proxyPlay)
+      if (!exists) {
+        // 如果不在历史记录中，添加到选项列表
+        const proxyName = getProxyName(proxyPlay)
+        proxyOptions.value.unshift({
+          value: proxyPlay,
+          label: proxyName,
+          url: proxyPlay
+        })
+      }
+      
+      // 设置默认选中当前配置的代理
+      currentProxyOption.value = proxyPlay
+    } else {
+      // 如果代理播放开关关闭，默认选择关闭
+      currentProxyOption.value = 'disabled'
+    }
+  } catch (error) {
+    console.error('加载代理播放配置失败:', error)
+    currentProxyOption.value = 'disabled'
+  }
+}
+
+// 加载代理播放地址历史记录
+const loadProxyHistory = () => {
+  try {
+    const history = JSON.parse(localStorage.getItem('proxy-play-history') || '[]')
+    
+    // 添加历史记录到选项中（去重）
+    history.forEach(item => {
+      const exists = proxyOptions.value.some(option => option.url === item.url)
+      if (!exists) {
+        const proxyName = getProxyName(item.url)
+        proxyOptions.value.push({
+          value: item.url,
+          label: proxyName,
+          url: item.url
+        })
+      }
+    })
+  } catch (error) {
+    console.error('加载代理播放历史记录失败:', error)
+  }
+}
+
+// 保存代理播放地址到历史记录
+const saveToProxyHistory = (url) => {
+  if (!url || url === 'disabled') return
+  
+  try {
+    const history = JSON.parse(localStorage.getItem('proxy-play-history') || '[]')
+    const proxyName = getProxyName(url)
+    
+    // 检查是否已存在
+    const existingIndex = history.findIndex(item => item.url === url)
+    
+    if (existingIndex !== -1) {
+      // 如果存在，移到最前面
+      history.splice(existingIndex, 1)
+    }
+    
+    // 添加到最前面
+    history.unshift({
+      url: url,
+      name: proxyName,
+      timestamp: Date.now()
+    })
+    
+    // 限制历史记录数量（最多保存10个）
+    if (history.length > 10) {
+      history.splice(10)
+    }
+    
+    localStorage.setItem('proxy-play-history', JSON.stringify(history))
+  } catch (error) {
+    console.error('保存代理播放历史记录失败:', error)
+  }
+}
+
+// 处理代理播放地址变更
+const handleProxyChange = (value) => {
+  currentProxyOption.value = value
+  
+  // 如果不是关闭，保存到历史记录
+  if (value !== 'disabled') {
+    saveToProxyHistory(value)
+  }
+  
+  // 发送事件给父组件
+  emit('proxy-change', value)
+}
+
+// 监听设置变化
+const handleStorageChange = (event) => {
+  if (event.key === 'addressSettings') {
+    // 设置发生变化时重新加载配置
+    loadProxyConfig()
+  }
+}
+
+// 组件挂载时加载配置
+onMounted(() => {
+  loadProxyConfig()
+  
+  // 监听localStorage变化
+  window.addEventListener('storage', handleStorageChange)
+  
+  // 监听自定义事件（用于同一页面内的设置变化）
+  window.addEventListener('addressSettingsChanged', loadProxyConfig)
+})
+
+// 组件卸载时清理监听器
+onUnmounted(() => {
+  window.removeEventListener('storage', handleStorageChange)
+  window.removeEventListener('addressSettingsChanged', loadProxyConfig)
+})
 </script>
 
 <style scoped>

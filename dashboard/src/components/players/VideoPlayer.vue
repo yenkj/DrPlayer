@@ -14,6 +14,7 @@
       @player-change="handlePlayerTypeChange"
       @open-skip-settings="openSkipSettingsDialog"
       @toggle-debug="toggleDebugDialog"
+      @proxy-change="handleProxyChange"
       @close="closePlayer"
     />
     <div class="video-player-container">
@@ -104,6 +105,7 @@ import DebugInfoDialog from './DebugInfoDialog.vue'
 import { useSkipSettings } from '@/composables/useSkipSettings'
 import { applyCSPBypass, setVideoReferrerPolicy, REFERRER_POLICIES, getCSPConfig } from '@/utils/csp'
 import { MediaPlayerManager, detectVideoFormat } from '@/utils/MediaPlayerManager'
+import { processVideoUrl, isProxyPlayEnabled } from '@/utils/proxyPlayer'
 
 // Props
 const props = defineProps({
@@ -395,8 +397,14 @@ const initVideoPlayer = (url) => {
     // 准备自定义请求头
     const headers = props.headers || {}
     
+    // 处理代理播放地址
+    const finalUrl = processVideoUrl(url, headers)
+    if (finalUrl !== url) {
+      console.log('🔄 [代理播放] 使用代理地址播放视频')
+    }
+    
     // 使用MediaPlayerManager加载视频
-    const player = mediaPlayerManager.value.loadVideo(url, headers)
+    const player = mediaPlayerManager.value.loadVideo(finalUrl, headers)
     
     if (player) {
       console.log(`使用${format}播放器加载视频成功`)
@@ -542,6 +550,41 @@ const closePlayer = () => {
 // 处理播放器类型变更
 const handlePlayerTypeChange = (newType) => {
   emit('player-change', newType)
+}
+
+// 处理代理播放地址变更
+const handleProxyChange = (proxyUrl) => {
+  console.log('代理播放地址变更:', proxyUrl)
+  
+  try {
+    // 获取当前的addressSettings
+    const savedAddresses = JSON.parse(localStorage.getItem('addressSettings') || '{}')
+    
+    if (proxyUrl === 'disabled') {
+      // 关闭代理播放
+      savedAddresses.proxyPlayEnabled = false
+      savedAddresses.proxyPlay = ''
+    } else {
+      // 启用代理播放并设置地址
+      savedAddresses.proxyPlayEnabled = true
+      savedAddresses.proxyPlay = proxyUrl
+    }
+    
+    // 保存到localStorage
+    localStorage.setItem('addressSettings', JSON.stringify(savedAddresses))
+    
+    // 触发自定义事件，通知其他组件设置已变化
+    window.dispatchEvent(new CustomEvent('addressSettingsChanged'))
+    
+    // 重新加载视频以应用新的代理设置
+    if (props.videoUrl) {
+      nextTick(() => {
+        initVideoPlayer(props.videoUrl)
+      })
+    }
+  } catch (error) {
+    console.error('保存代理播放设置失败:', error)
+  }
 }
 
 // 监听视频URL变化

@@ -37,6 +37,7 @@
                 </a-input>
                 <div class="address-config-actions">
                   <AddressHistory 
+                    ref="vodConfigHistory"
                     config-key="vod-config"
                     :current-value="addressSettings.vodConfig"
                     @select="(value) => addressSettings.vodConfig = value"
@@ -106,6 +107,7 @@
                 </a-input>
                 <div class="address-config-actions">
                   <AddressHistory 
+                    ref="liveConfigHistory"
                     config-key="live-config"
                     :current-value="addressSettings.liveConfig"
                     @select="(value) => addressSettings.liveConfig = value"
@@ -177,6 +179,7 @@
                 </a-input>
                 <div class="address-config-actions">
                   <AddressHistory 
+                    ref="proxyAccessHistory"
                     config-key="proxy-access"
                     :current-value="addressSettings.proxyAccess"
                     @select="(value) => addressSettings.proxyAccess = value"
@@ -224,7 +227,7 @@
                 </div>
               </div>
               <div class="address-config-input-group">
-                <a-switch v-model="addressSettings.proxyPlayEnabled" class="address-config-switch" />
+                <a-switch v-model="addressSettings.proxyPlayEnabled" class="address-config-switch" @change="handleProxyPlayEnabledChange" />
                 <a-input 
                   v-model="addressSettings.proxyPlay" 
                   placeholder="请输入代理播放接口地址"
@@ -238,10 +241,22 @@
                 </a-input>
                 <div class="address-config-actions">
                   <AddressHistory 
+                    ref="proxyPlayHistory"
                     config-key="proxy-play"
                     :current-value="addressSettings.proxyPlay"
                     @select="(value) => addressSettings.proxyPlay = value"
                   />
+                  <a-button 
+                    type="outline" 
+                    @click="resetProxyPlay"
+                    :loading="addressSaving.proxyPlayReset"
+                    size="medium"
+                  >
+                    <template #icon>
+                      <icon-refresh />
+                    </template>
+                    重置
+                  </a-button>
                   <a-button 
                     type="primary" 
                     @click="saveAddress('proxyPlay')"
@@ -299,6 +314,7 @@
                 </a-input>
                 <div class="address-config-actions">
                   <AddressHistory 
+                    ref="proxySniffHistory"
                     config-key="proxy-sniff"
                     :current-value="addressSettings.proxySniff"
                     @select="(value) => addressSettings.proxySniff = value"
@@ -778,7 +794,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import { 
   IconLink, 
@@ -822,13 +838,20 @@ import {
   setGlobalReferrerPolicy 
 } from '@/utils/csp'
 
+// AddressHistory 组件的 ref 引用
+const vodConfigHistory = ref(null)
+const liveConfigHistory = ref(null)
+const proxyAccessHistory = ref(null)
+const proxyPlayHistory = ref(null)
+const proxySniffHistory = ref(null)
+
 // 地址设置相关
 const addressSettings = reactive({
   vodConfig: '',
   liveConfig: '',
   proxyAccess: '',
   proxyAccessEnabled: false,
-  proxyPlay: '',
+  proxyPlay: 'http://localhost:57572/proxy?form=base64&url=${url}&header=${headers}#嗷呜',
   proxyPlayEnabled: false,
   proxySniff: 'http://localhost:57573/sniffer',
   proxySniffEnabled: false,
@@ -841,6 +864,7 @@ const addressSaving = reactive({
   liveConfigReset: false,
   proxyAccess: false,
   proxyPlay: false,
+  proxyPlayReset: false,
   proxySniff: false,
   proxySniffReset: false,
   snifferTimeout: false
@@ -919,6 +943,18 @@ const saveAddress = async (configType) => {
     
     localStorage.setItem('addressSettings', JSON.stringify(savedAddresses))
     
+    // 如果是代理播放地址相关配置，触发自定义事件通知播放器组件
+    if (configType === 'proxyPlay' || configType === 'proxyPlayEnabled') {
+      // 触发自定义事件，通知播放器组件地址设置已更改
+      window.dispatchEvent(new CustomEvent('addressSettingsChanged', {
+        detail: {
+          type: configType,
+          value: addressValue,
+          enabled: configType === 'proxyPlay' ? addressSettings.proxyPlayEnabled : addressValue
+        }
+      }))
+    }
+    
     // 如果是点播配置，尝试使用配置服务设置地址并自动设置直播配置地址
     if (configType === 'vodConfig') {
       try {
@@ -963,9 +999,17 @@ const saveAddress = async (configType) => {
     }
     
     // 添加到历史记录
-    const historyComponent = document.querySelector(`[config-key="${getConfigKey(configType)}"]`)
-    if (historyComponent && historyComponent.__vueParentComponent) {
-      historyComponent.__vueParentComponent.exposed.addHistory(addressValue)
+    const historyRefMap = {
+      'vodConfig': vodConfigHistory,
+      'liveConfig': liveConfigHistory,
+      'proxyAccess': proxyAccessHistory,
+      'proxyPlay': proxyPlayHistory,
+      'proxySniff': proxySniffHistory
+    }
+    
+    const historyRef = historyRefMap[configType]
+    if (historyRef && historyRef.value) {
+      historyRef.value.addHistory(addressValue)
     }
     
   } catch (error) {
@@ -1078,6 +1122,50 @@ const resetLiveConfig = async () => {
   }
 }
 
+// 重置代理播放接口
+const resetProxyPlay = async () => {
+  addressSaving.proxyPlayReset = true
+  try {
+    // 重置为默认值
+    addressSettings.proxyPlay = 'http://localhost:57572/proxy?form=base64&url=${url}&header=${headers}#嗷呜'
+    addressSettings.proxyPlayEnabled = false
+    
+    // 保存到本地存储
+    const savedAddresses = JSON.parse(localStorage.getItem('addressSettings') || '{}')
+    savedAddresses.proxyPlay = addressSettings.proxyPlay
+    savedAddresses.proxyPlayEnabled = addressSettings.proxyPlayEnabled
+    localStorage.setItem('addressSettings', JSON.stringify(savedAddresses))
+    
+    // 触发自定义事件，通知播放器组件代理播放设置已重置
+    window.dispatchEvent(new CustomEvent('addressSettingsChanged', {
+      detail: {
+        type: 'proxyPlayReset',
+        value: addressSettings.proxyPlay,
+        enabled: addressSettings.proxyPlayEnabled
+      }
+    }))
+    
+    addressStatus.proxyPlay = {
+      type: 'success',
+      message: '代理播放接口已重置为默认地址'
+    }
+    Message.success('代理播放接口重置成功')
+  } catch (error) {
+    console.error('重置代理播放接口失败:', error)
+    addressStatus.proxyPlay = {
+      type: 'error',
+      message: '重置失败：' + (error.message || '未知错误')
+    }
+    Message.error('重置失败：' + (error.message || '未知错误'))
+  } finally {
+    addressSaving.proxyPlayReset = false
+    // 8秒后清除状态消息
+    setTimeout(() => {
+      addressStatus.proxyPlay = null
+    }, 8000)
+  }
+}
+
 // 重置代理嗅探接口
 const resetProxySniff = async () => {
   addressSaving.proxySniffReset = true
@@ -1148,17 +1236,26 @@ const saveSnifferTimeout = async () => {
   }
 }
 
-// 获取配置键名
-const getConfigKey = (configType) => {
-  const keyMap = {
-    vodConfig: 'vod-config',
-    liveConfig: 'live-config',
-    proxyAccess: 'proxy-access',
-    proxyPlay: 'proxy-play',
-    proxySniff: 'proxy-sniff'
-  }
-  return keyMap[configType] || configType
+// 处理代理播放开关变化
+const handleProxyPlayEnabledChange = (enabled) => {
+  // 保存开关状态到本地存储
+  const savedAddresses = JSON.parse(localStorage.getItem('addressSettings') || '{}')
+  savedAddresses.proxyPlayEnabled = enabled
+  localStorage.setItem('addressSettings', JSON.stringify(savedAddresses))
+  
+  // 触发自定义事件，通知播放器组件代理播放开关状态已更改
+  window.dispatchEvent(new CustomEvent('addressSettingsChanged', {
+    detail: {
+      type: 'proxyPlayEnabled',
+      value: enabled,
+      enabled: enabled
+    }
+  }))
+  
+  console.log('代理播放开关状态已更改:', enabled)
 }
+
+// 注释：已删除 getConfigKey 函数，改为直接使用 ref 引用
 
 // 获取当前播放器名称
 const getCurrentPlayerName = () => {
@@ -1228,7 +1325,7 @@ const resetAllSettings = () => {
     liveConfig: '',
     proxyAccess: '',
     proxyAccessEnabled: false,
-    proxyPlay: '',
+    proxyPlay: 'http://localhost:57572/proxy?form=base64&url=${url}&header=${headers}#嗷呜',
     proxyPlayEnabled: false,
     proxySniff: 'http://localhost:57573/sniffer',
     proxySniffEnabled: false
@@ -1382,7 +1479,9 @@ const saveSettings = () => {
 watch(settings, saveSettings, { deep: true })
 
 // 初始化
-loadConfig()
+onMounted(async () => {
+  await loadConfig()
+})
 </script>
 
 <style scoped>
