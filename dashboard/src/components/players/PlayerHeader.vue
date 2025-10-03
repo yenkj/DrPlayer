@@ -57,11 +57,12 @@
             class="compact-select"
             size="small"
           >
-            <a-option value="disabled">代理播放:关闭</a-option>
+            <a-option value="disabled" title="关闭代理播放功能">代理播放:关闭</a-option>
             <a-option 
               v-for="option in proxyOptions" 
               :key="option.value" 
               :value="option.value"
+              :title="`${option.label}\n完整链接: ${option.url || option.value}`"
             >
               代理播放:{{ option.label }}
             </a-option>
@@ -81,8 +82,8 @@
             class="compact-select"
             size="small"
           >
-            <a-option value="default">默认播放器</a-option>
-            <a-option value="artplayer">ArtPlayer</a-option>
+            <a-option value="default" title="使用浏览器默认的HTML5视频播放器">默认播放器</a-option>
+            <a-option value="artplayer" title="使用ArtPlayer播放器，支持更多功能和自定义选项">ArtPlayer</a-option>
           </a-select>
         </div>
         

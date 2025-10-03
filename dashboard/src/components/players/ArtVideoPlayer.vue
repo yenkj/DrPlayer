@@ -61,6 +61,7 @@
       :headers="headers"
       :player-type="'artplayer'"
       :detected-format="detectedFormat"
+      :proxy-url="proxyVideoUrl"
       @close="closeDebugDialog"
     />
   </div>
@@ -152,6 +153,14 @@ const detectedFormat = ref('')
 // 计算属性：是否显示调试按钮
 const showDebugButton = computed(() => {
   return !!props.videoUrl
+})
+
+// 计算属性：代理后的视频链接
+const proxyVideoUrl = computed(() => {
+  if (!props.videoUrl) return ''
+  
+  const headers = props.headers || {}
+  return processVideoUrl(props.videoUrl, headers)
 })
 
 // 选集弹窗相关数据已移除，现在使用ArtPlayer的layer功能
@@ -625,9 +634,9 @@ const handleProxyChange = (proxyUrl) => {
     const savedAddresses = JSON.parse(localStorage.getItem('addressSettings') || '{}')
     
     if (proxyUrl === 'disabled') {
-      // 关闭代理播放
+      // 关闭代理播放，但保留设置界面中配置的代理地址
       savedAddresses.proxyPlayEnabled = false
-      savedAddresses.proxyPlay = ''
+      // 注意：不清除 proxyPlay 地址，保留用户在设置界面的配置
     } else {
       // 启用代理播放并设置地址
       savedAddresses.proxyPlayEnabled = true
