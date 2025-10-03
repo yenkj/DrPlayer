@@ -118,7 +118,7 @@
       <a-card class="video-info-card" :class="{ 'collapsed-when-playing': showVideoPlayer || showBookReader }">
         <div class="video-header">
           <div class="video-poster" @click="showImageModal">
-            <img :src="videoDetail.vod_pic" :alt="videoDetail.vod_name" @error="handleImageError" />
+            <img :src="finalPosterImage" :alt="videoDetail.vod_name" @error="handleImageError" />
             <div class="poster-overlay">
               <icon-eye class="view-icon" />
               <span>查看大图</span>
@@ -318,6 +318,7 @@ const descriptionExpanded = ref(false)
 const currentRoute = ref(0)
 const currentEpisode = ref(0)
 const favoriteLoading = ref(false)
+const imageErrorCount = ref(0) // 图片加载失败计数器
 // 当前使用的站源信息（可能是全局站源或临时站源）
 const currentSiteInfo = ref({
   name: '',
@@ -413,6 +414,20 @@ const viewerOptions = ref({
 })
 
 // 计算属性
+// 最终显示的海报图片
+const finalPosterImage = computed(() => {
+  // 优先使用详情页接口返回的图片
+  if (videoDetail.value?.vod_pic) {
+    return videoDetail.value.vod_pic
+  }
+  // 其次使用来源页面传递的图片
+  if (originalVideoInfo.value?.sourcePic) {
+    return originalVideoInfo.value.sourcePic
+  }
+  // 最后使用默认图片
+  return '/src/assets/default-poster.svg'
+})
+
 const playRoutes = computed(() => {
   if (!videoDetail.value?.vod_play_from || !videoDetail.value?.vod_play_url) {
     return []
@@ -491,6 +506,9 @@ const loadVideoDetail = async () => {
     return
   }
 
+  // 重置图片错误计数器
+  imageErrorCount.value = 0
+
   // 从路由参数中获取原始视频信息
   originalVideoInfo.value = {
     id: route.params.id,
@@ -503,7 +521,8 @@ const loadVideoDetail = async () => {
     remarks: route.query.remarks || '',
     content: route.query.content || '',
     actor: route.query.actor || '',
-    director: route.query.director || ''
+    director: route.query.director || '',
+    sourcePic: route.query.sourcePic || '' // 来源页面的图片，用于备用
   }
 
   // 检查是否有当前站点
@@ -753,7 +772,17 @@ const handleImageError = (event) => {
   if (event.target.src.includes('default-poster.svg')) {
     return
   }
-  // 使用BASE_URL确保在任何路由层级和部署环境下都能正确访问
+  
+  imageErrorCount.value++
+  
+  // 第一次失败：如果当前显示的是详情页接口返回的图片，尝试使用来源页面的图片
+  if (imageErrorCount.value === 1 && originalVideoInfo.value?.sourcePic && 
+      videoDetail.value?.vod_pic && event.target.src === videoDetail.value.vod_pic) {
+    event.target.src = originalVideoInfo.value.sourcePic
+    return
+  }
+  
+  // 第二次失败或没有备用图片：使用默认图片
   const basePath = import.meta.env.BASE_URL || '/'
   event.target.src = `${basePath}default-poster.svg`
   event.target.style.objectFit = 'contain'
@@ -761,12 +790,14 @@ const handleImageError = (event) => {
 }
 
 const showImageModal = () => {
-  if (videoDetail.value?.vod_pic) {
+  const currentImage = finalPosterImage.value
+  // 只有当不是默认图片时才显示大图查看
+  if (currentImage && !currentImage.includes('default-poster.svg')) {
     // 设置当前图片到 viewer，包含图片URL和名称
-    viewerImages.value = [videoDetail.value.vod_pic]
+    viewerImages.value = [currentImage]
     viewerImageData.value = [{
-      src: videoDetail.value.vod_pic,
-      name: videoDetail.value.vod_name || '未知标题'
+      src: currentImage,
+      name: videoDetail.value?.vod_name || originalVideoInfo.value?.name || '未知标题'
     }]
     
     // 等待下一个 tick 后显示 viewer
