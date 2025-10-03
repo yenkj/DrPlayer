@@ -58,6 +58,7 @@
         :player-type="playerType"
         :episodes="currentRouteEpisodes"
         :current-episode-index="currentEpisodeIndex"
+        :headers="parsedHeaders"
         @close="handlePlayerClose"
         @player-change="handlePlayerTypeChange"
         @next-episode="handleNextEpisode"
@@ -74,6 +75,7 @@
         :episodes="currentRouteEpisodes"
         :current-episode-index="currentEpisodeIndex"
         :auto-next="true"
+        :headers="parsedHeaders"
         @close="handlePlayerClose"
         @player-change="handlePlayerTypeChange"
         @next-episode="handleNextEpisode"
@@ -327,6 +329,8 @@ const currentSiteInfo = ref({
 const showVideoPlayer = ref(false)
 // 解析后的播放URL（用于T4接口解析结果）
 const parsedVideoUrl = ref('')
+// 解析后的请求头（用于T4接口解析结果）
+const parsedHeaders = ref({})
 
 // 小说阅读器相关
 const showBookReader = ref(false)
@@ -1023,7 +1027,12 @@ const selectEpisode = async (index) => {
        } else {
          // 普通视频内容
          console.log('启动内置播放器播放直链视频:', parseResult.url)
+         console.log('T4解析结果headers:', parseResult.headers)
+         
          parsedVideoUrl.value = parseResult.url
+         // 提取并存储headers，如果没有headers则使用空对象
+         parsedHeaders.value = parseResult.headers || {}
+         
          parsedNovelContent.value = null
          parsedComicContent.value = null
          showBookReader.value = false
@@ -1037,8 +1046,9 @@ const selectEpisode = async (index) => {
        
        // 检查嗅探功能是否启用
        if (!isSnifferEnabled()) {
-         // 清空解析URL和小说内容，不启动播放器
+         // 清空解析URL、headers和小说内容，不启动播放器
          parsedVideoUrl.value = ''
+         parsedHeaders.value = {}
          parsedNovelContent.value = null
          showBookReader.value = false
          
@@ -1060,8 +1070,9 @@ const selectEpisode = async (index) => {
      } else if (parseResult.playType === 'parse') {
        // jx:1 - 需要解析
        console.log('需要解析播放:', parseResult)
-       // 清空解析URL和小说内容，不启动播放器
+       // 清空解析URL、headers和小说内容，不启动播放器
        parsedVideoUrl.value = ''
+       parsedHeaders.value = {}
        parsedNovelContent.value = null
        showBookReader.value = false
        
@@ -1076,6 +1087,7 @@ const selectEpisode = async (index) => {
        // 其他情况，回退到原始播放方式
        console.log('使用原始播放方式:', episodeUrl)
        parsedVideoUrl.value = ''
+       parsedHeaders.value = {}
        parsedNovelContent.value = null
        showBookReader.value = false
        showVideoPlayer.value = true
@@ -1088,6 +1100,7 @@ const selectEpisode = async (index) => {
      // 解析失败时回退到原始播放方式
      console.log('回退到原始播放方式:', episodeUrl)
      parsedVideoUrl.value = ''
+     parsedHeaders.value = {}
      parsedNovelContent.value = null
      showBookReader.value = false
      showVideoPlayer.value = true
