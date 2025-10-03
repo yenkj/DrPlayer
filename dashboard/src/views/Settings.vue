@@ -830,6 +830,8 @@ import {
 } from '@arco-design/web-vue/es/icon'
 import AddressHistory from '@/components/AddressHistory.vue'
 import PlayerSelector from '@/components/PlayerSelector.vue'
+import configService from '@/api/services/config'
+import siteService from '@/api/services/site'
 import { 
   getCSPConfig, 
   saveCSPConfig, 
@@ -958,8 +960,16 @@ const saveAddress = async (configType) => {
     // 如果是点播配置，尝试使用配置服务设置地址并自动设置直播配置地址
     if (configType === 'vodConfig') {
       try {
-        const configService = (await import('@/api/services/config')).default
         await configService.setConfigUrl(addressValue)
+        
+        // 清除缓存并刷新点播数据，确保下次换源时列表是最新的
+        try {
+          await siteService.loadSitesFromConfig(true) // 强制刷新配置数据
+          console.log('点播配置保存后已刷新缓存数据')
+        } catch (refreshError) {
+          console.error('刷新点播数据失败:', refreshError)
+          // 即使刷新失败也不影响保存成功的提示
+        }
         
         // 检查是否自动设置了直播配置地址
         const liveConfigUrl = configService.getLiveConfigUrl()
@@ -971,9 +981,9 @@ const saveAddress = async (configType) => {
           savedAddresses.liveConfig = liveConfigUrl
           localStorage.setItem('addressSettings', JSON.stringify(savedAddresses))
           
-          Message.success('点播配置保存成功，已自动设置直播配置地址')
+          Message.success('点播配置保存成功，已自动设置直播配置地址并刷新数据')
         } else {
-          Message.success('点播配置保存成功')
+          Message.success('点播配置保存成功，已刷新点播数据')
         }
       } catch (error) {
         console.error('设置配置服务失败:', error)
@@ -982,7 +992,6 @@ const saveAddress = async (configType) => {
     } else if (configType === 'liveConfig') {
       // 如果是直播配置，使用配置服务设置直播配置地址
       try {
-        const configService = (await import('@/api/services/config')).default
         await configService.setLiveConfigUrl(addressValue)
         Message.success('直播配置地址保存成功')
       } catch (error) {
@@ -1044,7 +1053,6 @@ const testAddress = async (configType) => {
   addressTesting[configType] = true
   try {
     // 使用配置服务验证配置地址
-    const configService = (await import('@/api/services/config')).default
     const isValid = await configService.validateConfigUrl(addressValue)
     
     if (isValid) {
@@ -1081,7 +1089,6 @@ const resetLiveConfig = async () => {
   addressSaving.liveConfigReset = true
   try {
     // 使用配置服务重置直播配置地址
-    const configService = (await import('@/api/services/config')).default
     const success = await configService.resetLiveConfigUrl()
     
     if (success) {
@@ -1423,7 +1430,6 @@ const loadConfig = async () => {
     }
     
     // 兼容旧的配置地址设置
-    const configService = (await import('@/api/services/config')).default
     const savedUrl = configService.getConfigUrl()
     if (savedUrl && !addressSettings.vodConfig) {
       addressSettings.vodConfig = savedUrl
