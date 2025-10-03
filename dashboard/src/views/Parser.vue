@@ -48,6 +48,19 @@
               更多
             </a-button>
             <template #content>
+              <a-doption value="enable-all">
+                <template #icon>
+                  <icon-check />
+                </template>
+                一键启用
+              </a-doption>
+              <a-doption value="disable-all">
+                <template #icon>
+                  <icon-close />
+                </template>
+                一键停用
+              </a-doption>
+              <a-divider style="margin: 4px 0;" />
               <a-doption value="load-config">
                 <template #icon>
                   <icon-link />
@@ -150,7 +163,7 @@
                     <div class="parser-actions">
                       <a-switch
                         v-model="parser.enabled"
-                        @change="toggleParser(parser.id)"
+                        @update:model-value="(value) => handleSwitchChange(parser.id, value)"
                         size="small"
                       />
                       <a-button
@@ -195,8 +208,8 @@
                   <div class="parser-details">
                     <div class="parser-url">{{ parser.url }}</div>
                     <div class="parser-meta">
-                      <a-tag :color="parser.type === '0' ? 'blue' : 'green'" size="small">
-                        {{ parser.type === '0' ? '嗅探' : 'Json' }}
+                      <a-tag :color="String(parser.type) === '0' ? 'blue' : 'green'" size="small">
+                        {{ String(parser.type) === '0' ? '嗅探' : 'Json' }}
                       </a-tag>
                       <span v-if="parser.ext && parser.ext.flag" class="parser-flags">
                         支持: {{ parser.ext.flag.join(', ') }}
@@ -454,9 +467,12 @@ const filteredParsers = computed(() => {
     result = result.filter(parser => !parser.enabled)
   }
   
-  // 类型过滤
+  // 类型过滤 - 处理数字和字符串类型的兼容性
   if (filterType.value) {
-    result = result.filter(parser => parser.type === filterType.value)
+    result = result.filter(parser => {
+      // 将两个值都转换为字符串进行比较，确保兼容性
+      return String(parser.type) === String(filterType.value)
+    })
   }
   
   return result
@@ -464,13 +480,70 @@ const filteredParsers = computed(() => {
 
 // 监听过滤结果变化，更新拖拽数据
 watch(filteredParsers, (newFiltered) => {
-  dragParsers.value = [...newFiltered]
+  // 只在筛选条件变化时才完全重新创建数组
+  // 避免在开关切换时重新创建，保持响应式绑定
+  if (dragParsers.value.length !== newFiltered.length || 
+      !dragParsers.value.every(item => newFiltered.some(filtered => filtered.id === item.id))) {
+    dragParsers.value = [...newFiltered]
+  } else {
+    // 如果数组长度和ID都相同，只更新现有项的属性
+    dragParsers.value.forEach((dragItem, index) => {
+      const filteredItem = newFiltered.find(item => item.id === dragItem.id)
+      if (filteredItem) {
+        Object.assign(dragItem, filteredItem)
+      }
+    })
+  }
 }, { immediate: true })
+
+// 监听筛选条件变化，确保筛选功能正常工作
+watch([searchKeyword, filterStatus, filterType], () => {
+  // 当筛选条件变化时，完全重新创建拖拽列表
+  dragParsers.value = [...filteredParsers.value]
+}, { immediate: false })
 
 // 方法
 const toggleParser = (id) => {
   parserStore.toggleParser(id)
   Message.success('解析器状态已更新')
+}
+
+const handleSwitchChange = (id, value) => {
+  // 直接更新store中的状态，不需要切换，因为v-model已经更新了本地状态
+  const parser = parserStore.parsers.find(p => p.id === id)
+  if (parser) {
+    parser.enabled = value
+    parserStore.saveToLocalStorage()
+    Message.success('解析器状态已更新')
+  }
+}
+
+const enableAllParsers = () => {
+  const count = parserStore.parsers.length
+  if (count === 0) {
+    Message.warning('没有可启用的解析器')
+    return
+  }
+  
+  parserStore.parsers.forEach(parser => {
+    parser.enabled = true
+  })
+  parserStore.saveToLocalStorage()
+  Message.success(`已启用所有 ${count} 个解析器`)
+}
+
+const disableAllParsers = () => {
+  const count = parserStore.parsers.length
+  if (count === 0) {
+    Message.warning('没有可停用的解析器')
+    return
+  }
+  
+  parserStore.parsers.forEach(parser => {
+    parser.enabled = false
+  })
+  parserStore.saveToLocalStorage()
+  Message.success(`已停用所有 ${count} 个解析器`)
 }
 
 const editParser = (parser) => {
@@ -672,6 +745,12 @@ const resetFromConfig = async () => {
 
 const handleMoreAction = (value) => {
   switch (value) {
+    case 'enable-all':
+      enableAllParsers()
+      break
+    case 'disable-all':
+      disableAllParsers()
+      break
     case 'load-config':
       showConfigDialog.value = true
       break
