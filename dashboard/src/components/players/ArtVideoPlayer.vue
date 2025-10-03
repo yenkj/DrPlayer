@@ -7,10 +7,12 @@
       :auto-next-enabled="autoNextEnabled"
       :countdown-enabled="countdownEnabled"
       :skip-enabled="skipEnabled"
+      :show-debug-button="showDebugButton"
       @toggle-auto-next="toggleAutoNext"
       @toggle-countdown="toggleCountdown"
       @player-change="handlePlayerTypeChange"
       @open-skip-settings="openSkipSettingsDialog"
+      @toggle-debug="toggleDebugDialog"
       @close="closePlayer"
     />
     <div class="art-player-wrapper" v-show="props.visible">
@@ -50,6 +52,16 @@
       @close="closeSkipSettingsDialog"
       @save="saveSkipSettings"
     />
+    
+    <!-- 调试信息弹窗组件 -->
+    <DebugInfoDialog
+      :visible="showDebugDialog"
+      :video-url="videoUrl"
+      :headers="headers"
+      :player-type="'artplayer'"
+      :detected-format="detectedFormat"
+      @close="closeDebugDialog"
+    />
   </div>
   </a-card>
 </template>
@@ -66,6 +78,7 @@ import { MediaPlayerManager, detectVideoFormat, createCustomPlayer, destroyCusto
 Artplayer.PLAYBACK_RATE = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5]
 import PlayerHeader from './PlayerHeader.vue'
 import SkipSettingsDialog from './SkipSettingsDialog.vue'
+import DebugInfoDialog from './DebugInfoDialog.vue'
 import { useSkipSettings } from '@/composables/useSkipSettings'
 import { applyCSPBypass, setVideoReferrerPolicy, REFERRER_POLICIES, getCSPConfig } from '@/utils/csp'
 
@@ -129,6 +142,15 @@ const autoNextCountdown = ref(0) // 自动下一集倒计时
 const autoNextTimer = ref(null) // 自动下一集定时器
 const showAutoNextDialog = ref(false) // 显示自动下一集对话框
 const countdownEnabled = ref(false) // 倒计时开关，默认关闭
+
+// 调试相关
+const showDebugDialog = ref(false)
+const detectedFormat = ref('')
+
+// 计算属性：是否显示调试按钮
+const showDebugButton = computed(() => {
+  return !!props.videoUrl
+})
 
 // 选集弹窗相关数据已移除，现在使用ArtPlayer的layer功能
 
@@ -288,6 +310,7 @@ const initArtPlayer = async (url) => {
   try {
     // 检测视频格式
     const videoFormat = detectVideoFormat(url)
+    detectedFormat.value = videoFormat
     console.log('检测到视频格式:', videoFormat)
     
     // 创建 ArtPlayer 实例
@@ -730,6 +753,15 @@ const toggleCountdown = () => {
   if (!countdownEnabled.value) {
     cancelAutoNext()
   }
+}
+
+// 调试弹窗控制方法
+const toggleDebugDialog = () => {
+  showDebugDialog.value = !showDebugDialog.value
+}
+
+const closeDebugDialog = () => {
+  showDebugDialog.value = false
 }
 
 // 滚动到当前选集位置

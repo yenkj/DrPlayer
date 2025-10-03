@@ -8,10 +8,12 @@
       :auto-next-enabled="autoNext"
       :countdown-enabled="showCountdown"
       :skip-enabled="skipEnabled"
+      :show-debug-button="showDebugButton"
       @toggle-auto-next="toggleAutoNext"
       @toggle-countdown="toggleCountdown"
       @player-change="handlePlayerTypeChange"
       @open-skip-settings="openSkipSettingsDialog"
+      @toggle-debug="toggleDebugDialog"
       @close="closePlayer"
     />
     <div class="video-player-container">
@@ -77,6 +79,16 @@
         @close="closeSkipSettingsDialog"
         @save="saveSkipSettings"
       />
+      
+      <!-- 调试信息弹窗组件 -->
+      <DebugInfoDialog
+        :visible="showDebugDialog"
+        :video-url="videoUrl"
+        :headers="headers"
+        :player-type="'default'"
+        :detected-format="detectedFormat"
+        @close="closeDebugDialog"
+      />
     </div>
   </a-card>
 </template>
@@ -88,6 +100,7 @@ import { IconClose } from '@arco-design/web-vue/es/icon'
 import Hls from 'hls.js'
 import PlayerHeader from './PlayerHeader.vue'
 import SkipSettingsDialog from './SkipSettingsDialog.vue'
+import DebugInfoDialog from './DebugInfoDialog.vue'
 import { useSkipSettings } from '@/composables/useSkipSettings'
 import { applyCSPBypass, setVideoReferrerPolicy, REFERRER_POLICIES, getCSPConfig } from '@/utils/csp'
 import { MediaPlayerManager, detectVideoFormat } from '@/utils/MediaPlayerManager'
@@ -143,6 +156,15 @@ const autoNextCountdown = ref(10)
 const countdownTimer = ref(null)
 const isProcessingAutoNext = ref(false) // 防止重复触发自动连播
 const currentSpeed = ref(1) // 当前播放倍速
+
+// 调试相关
+const showDebugDialog = ref(false)
+const detectedFormat = ref('')
+
+// 计算属性：是否显示调试按钮
+const showDebugButton = computed(() => {
+  return !!props.videoUrl
+})
 
 // 检查是否有下一集
 const hasNextEpisode = () => {
@@ -248,6 +270,15 @@ const changePlaybackRate = () => {
     videoPlayer.value.playbackRate = parseFloat(currentSpeed.value)
     console.log('播放倍速已设置为:', currentSpeed.value)
   }
+}
+
+// 调试弹窗控制方法
+const toggleDebugDialog = () => {
+  showDebugDialog.value = !showDebugDialog.value
+}
+
+const closeDebugDialog = () => {
+  showDebugDialog.value = false
 }
 
 // 链接类型判断函数
@@ -358,6 +389,7 @@ const initVideoPlayer = (url) => {
     resetSkipState()
     
     const format = detectVideoFormat(url)
+    detectedFormat.value = format
     console.log(`检测到视频格式: ${format}`)
     
     // 准备自定义请求头
