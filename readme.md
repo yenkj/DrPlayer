@@ -1,18 +1,18 @@
 ```shell
-yarn create vite
-yarn add primevue primeicons
-yarn add unplugin-vue-components
-yarn add @primevue/auto-import-resolver
-yarn add @primevue/themes
-yarn add primeflex
+pnpm create vite
+pnpm add primevue primeicons
+pnpm add unplugin-vue-components
+pnpm add @primevue/auto-import-resolver
+pnpm add @primevue/themes
+pnpm add primeflex
 
-yarn add vue-router
-yarn add pinia
+pnpm add vue-router
+pnpm add pinia
 
-yarn remove primevue primeicons @primevue/auto-import-resolver primeflex @primevue/themes
-yarn add --dev @arco-design/web-vue
-yarn add json-server
-yarn add axios
+pnpm remove primevue primeicons @primevue/auto-import-resolver primeflex @primevue/themes
+pnpm add --save-dev @arco-design/web-vue
+pnpm add json-server
+pnpm add axios
 ```
 https://juejin.cn/post/7387581121519812617
 
