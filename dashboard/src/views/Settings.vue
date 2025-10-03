@@ -1353,7 +1353,7 @@ const loadConfig = async () => {
   // 加载CSP设置
   try {
     const cspConfig = getCSPConfig()
-    settings.cspBypass = cspConfig.enabled
+    settings.cspBypass = cspConfig.autoBypass
     settings.referrerPolicy = cspConfig.referrerPolicy
   } catch (error) {
     console.error('Failed to load CSP config:', error)
@@ -1367,7 +1367,7 @@ const saveSettings = () => {
   // 保存CSP设置
   try {
     saveCSPConfig({
-      enabled: settings.cspBypass,
+      autoBypass: settings.cspBypass,
       referrerPolicy: settings.referrerPolicy
     })
     
