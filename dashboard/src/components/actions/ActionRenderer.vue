@@ -132,8 +132,8 @@ export default {
       [ActionType.EDIT]: 'InputAction', // edit类型使用InputAction，通过multiLine区分
       [ActionType.MULTI_INPUT]: 'MultiInputAction',
       [ActionType.MULTI_INPUT_X]: 'MultiInputAction',
-      [ActionType.MENU]: 'MenuAction',
-      [ActionType.SELECT]: 'SelectAction',
+      [ActionType.MENU]: 'MenuAction', // 单选菜单
+      [ActionType.SELECT]: 'MenuAction', // 多选菜单，使用MenuAction组件
       [ActionType.MSGBOX]: 'MsgBoxAction',
       [ActionType.WEBVIEW]: 'WebViewAction',
       [ActionType.HELP]: 'HelpAction'

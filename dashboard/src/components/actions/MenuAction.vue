@@ -55,121 +55,128 @@
 
       <!-- 菜单选项区域 -->
       <div class="menu-section">
-        <div class="menu-options-container">
-          <div
-            v-for="(option, index) in menuOptions"
-            :key="option.value || index"
-            class="menu-option-card"
-            :class="{ 
-              'selected': isSelected(option),
-              'disabled': option.disabled,
-              'has-description': option.description
-            }"
-            @click="handleOptionClick(option, index)"
-          >
-            <!-- 选项图标 -->
-            <div v-if="option.icon" class="option-icon-container">
-              <!-- 网络图片 -->
-              <img v-if="option.icon.startsWith('http')" :src="option.icon" alt="" class="option-icon-image" />
-              <!-- SVG 图标 -->
-              <div v-else-if="option.icon.includes('<svg')" class="option-icon-svg" v-html="option.icon"></div>
-              <!-- Unicode 图标 -->
-              <span v-else-if="option.icon.startsWith('&#')" class="option-icon-unicode" v-html="option.icon"></span>
-              <!-- Emoji 图标 -->
-              <span v-else-if="isEmoji(option.icon)" class="option-icon-emoji">{{ option.icon }}</span>
-              <!-- CSS 类图标 -->
-              <span v-else class="option-icon-class" :class="option.icon"></span>
-            </div>
-
-            <!-- 选项内容 -->
-            <div class="option-content">
-              <div class="option-title">{{ option.name }}</div>
-              <div v-if="option.description" class="option-description">
-                {{ option.description }}
-              </div>
-            </div>
-
-            <!-- 选择指示器 -->
-            <div class="option-selector">
-              <!-- 复选框（多选） -->
-              <div v-if="isMultiSelect" class="checkbox-modern">
-                <input
-                  type="checkbox"
-                  :id="`menu-checkbox-${index}`"
-                  :checked="isSelected(option)"
-                  @change="handleOptionClick(option, index)"
-                  @click.stop
-                  class="checkbox-input"
-                />
-                <label :for="`menu-checkbox-${index}`" class="checkbox-label">
-                  <div class="checkbox-indicator">
-                    <svg v-if="isSelected(option)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                      <polyline points="20,6 9,17 4,12"></polyline>
-                    </svg>
-                  </div>
-                </label>
+        <div class="menu-layout">
+          <!-- 菜单选项列表 -->
+          <div class="menu-options-container">
+            <div
+              v-for="(option, index) in menuOptions"
+              :key="option.value || index"
+              class="menu-option-card"
+              :class="{ 
+                'selected': isSelected(option),
+                'disabled': option.disabled,
+                'has-description': option.description
+              }"
+              @click="handleOptionClick(option, index)"
+            >
+              <!-- 选项图标 -->
+              <div v-if="option.icon" class="option-icon-container">
+                <!-- 网络图片 -->
+                <img v-if="option.icon.startsWith('http')" :src="option.icon" alt="" class="option-icon-image" />
+                <!-- SVG 图标 -->
+                <div v-else-if="option.icon.includes('<svg')" class="option-icon-svg" v-html="option.icon"></div>
+                <!-- Unicode 图标 -->
+                <span v-else-if="option.icon.startsWith('&#')" class="option-icon-unicode" v-html="option.icon"></span>
+                <!-- Emoji 图标 -->
+                <span v-else-if="isEmoji(option.icon)" class="option-icon-emoji">{{ option.icon }}</span>
+                <!-- CSS 类图标 -->
+                <span v-else class="option-icon-class" :class="option.icon"></span>
               </div>
 
-              <!-- 单选框（单选） -->
-              <div v-else class="radio-modern">
-                <input
-                  type="radio"
-                  :id="`menu-radio-${index}`"
-                  :name="'menu-radio-group'"
-                  :checked="isSelected(option)"
-                  @change="handleOptionClick(option, index)"
-                  @click.stop
-                  class="radio-input"
-                />
-                <label :for="`menu-radio-${index}`" class="radio-label">
-                  <div class="radio-indicator">
-                    <div v-if="isSelected(option)" class="radio-dot"></div>
-                  </div>
-                </label>
+              <!-- 选项内容 -->
+              <div class="option-content">
+                <div class="option-title">{{ option.name }}</div>
+                <div v-if="option.description" class="option-description">
+                  {{ option.description }}
+                </div>
+              </div>
+
+              <!-- 选择指示器 -->
+              <div class="option-selector">
+                <!-- 复选框（多选） -->
+                <div v-if="isMultiSelect" class="checkbox-modern">
+                  <input
+                    type="checkbox"
+                    :id="`menu-checkbox-${index}`"
+                    :checked="isSelected(option)"
+                    @change="handleCheckboxClick(option, index, $event)"
+                    class="checkbox-input"
+                  />
+                  <label class="checkbox-label" @click="handleCheckboxClick(option, index, $event)">
+                    <div class="checkbox-indicator">
+                      <svg v-if="isSelected(option)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <polyline points="20,6 9,17 4,12"></polyline>
+                      </svg>
+                    </div>
+                  </label>
+                </div>
+
+                <!-- 单选框（单选） -->
+                <div v-else class="radio-modern">
+                  <input
+                    type="radio"
+                    :id="`menu-radio-${index}`"
+                    :name="'menu-radio-group'"
+                    :checked="isSelected(option)"
+                    @change="handleRadioClick(option, index, $event)"
+                    class="radio-input"
+                  />
+                  <label class="radio-label" @click="handleRadioClick(option, index, $event)">
+                    <div class="radio-indicator">
+                      <div v-if="isSelected(option)" class="radio-dot"></div>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- 多选操作按钮 -->
-      <div v-if="isMultiSelect" class="multi-select-controls">
-        <div class="control-buttons">
-          <button 
-            class="control-btn"
-            @click="selectAll"
-            :disabled="selectedOptions.length === menuOptions.length"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="9,11 12,14 22,4"></polyline>
-              <path d="m21,3-6.5,6.5L11,6"></path>
-            </svg>
-            全选
-          </button>
-          <button 
-            class="control-btn"
-            @click="clearAll"
-            :disabled="selectedOptions.length === 0"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="15" y1="9" x2="9" y2="15"></line>
-              <line x1="9" y1="9" x2="15" y2="15"></line>
-            </svg>
-            全清
-          </button>
-          <button 
-            class="control-btn"
-            @click="invertSelection"
-            :disabled="menuOptions.length === 0"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-              <path d="m9 14 2 2 4-4"></path>
-            </svg>
-            反选
-          </button>
+          <!-- 多选快捷操作按钮列 -->
+          <div v-if="isMultiSelect" class="quick-actions-column">
+            <div class="quick-actions-container">
+              <div class="quick-actions-title">快捷操作</div>
+              <div class="quick-actions-buttons">
+                <button 
+                  class="quick-action-btn"
+                  @click="selectAll"
+                  :disabled="selectedOptions.length === menuOptions.length"
+                  title="选择所有选项"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,11 12,14 22,4"></polyline>
+                    <path d="m21,3-6.5,6.5L11,6"></path>
+                  </svg>
+                  <span>全选</span>
+                </button>
+                <button 
+                  class="quick-action-btn"
+                  @click="clearAll"
+                  :disabled="selectedOptions.length === 0"
+                  title="清除所有选择"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                  </svg>
+                  <span>全清</span>
+                </button>
+                <button 
+                  class="quick-action-btn"
+                  @click="invertSelection"
+                  :disabled="menuOptions.length === 0"
+                  title="反转当前选择"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                    <path d="m9 14 2 2 4-4"></path>
+                  </svg>
+                  <span>反选</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -295,7 +302,8 @@ export default {
 
     // 计算属性
     const isMultiSelect = computed(() => {
-      return props.config.type === 'multiSelect'
+      // select 类型为多选，menu 类型为单选
+      return props.config.type === 'select' || props.config.type === 'multiSelect'
     })
 
     const menuOptions = computed(() => {
@@ -409,6 +417,31 @@ export default {
       // 搜索逻辑在计算属性中处理
     }
 
+    // 复选框点击处理
+    const handleCheckboxClick = (option, index, event) => {
+      event.stopPropagation()
+      if (option.disabled) return
+      
+      if (isSelected(option)) {
+        removeSelection(option)
+      } else {
+        selectedOptions.value.push(option)
+      }
+    }
+
+    // 单选框点击处理
+    const handleRadioClick = (option, index, event) => {
+      event.stopPropagation()
+      if (option.disabled) return
+      
+      selectedOptions.value = [option]
+      
+      // 自动提交
+      if (props.config.autoSubmit) {
+        handleSubmit()
+      }
+    }
+
     // 检测是否为emoji图标
     const isEmoji = (str) => {
       const emojiRegex = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u
@@ -474,8 +507,17 @@ export default {
       if (isMultiSelect.value) {
         result.selectedValues = selectedOptions.value.map(option => option.value)
         result.selectedOptions = selectedOptions.value
-        // 多选模式下，将选中的值数组转换为字符串传递给T4接口
-        value = result.selectedValues.join(',')
+        
+        // 多选模式下，生成包含所有选项状态的JSON列表
+        const allOptionsWithStatus = menuOptions.value.map(option => ({
+          name: option.name,
+          action: option.value,
+          selected: selectedOptions.value.some(selected => selected.value === option.value)
+        }))
+        
+        // 将JSON列表转换为字符串传递给T4接口
+        value = JSON.stringify(allOptionsWithStatus)
+        console.log('多选菜单T4接口数据格式:', allOptionsWithStatus)
       } else {
         const selected = selectedOptions.value[0]
         result.selectedValue = selected.value
@@ -671,6 +713,8 @@ export default {
       isSelected,
       isEmoji,
       handleOptionClick,
+      handleCheckboxClick,
+      handleRadioClick,
       removeSelection,
       selectAll,
       clearAll,
@@ -812,13 +856,98 @@ export default {
   flex: 1;
 }
 
+/* 菜单布局容器 */
+.menu-layout {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
 .menu-options-container {
+  flex: 1;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.625rem;
   max-height: 400px;
   overflow-y: auto;
   padding-right: 0.25rem;
+}
+
+/* 快捷操作按钮列 */
+.quick-actions-column {
+  flex-shrink: 0;
+  width: 120px;
+  position: sticky;
+  top: 0;
+}
+
+.quick-actions-container {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--ds-radius-lg);
+  padding: 0.75rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.quick-actions-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--action-color-text-secondary);
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.quick-actions-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--ds-radius-md);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--action-color-text);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--ds-duration-fast) ease;
+  outline: none;
+}
+
+.quick-action-btn:hover:not(:disabled) {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.1);
+  color: rgb(59, 130, 246);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.quick-action-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.quick-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.quick-action-btn svg {
+  flex-shrink: 0;
+}
+
+.quick-action-btn span {
+  white-space: nowrap;
 }
 
 .menu-options-container::-webkit-scrollbar {
