@@ -333,7 +333,7 @@ export default {
       default: ''
     }
   },
-  emits: ['submit', 'cancel', 'close', 'action', 'toast', 'reset'],
+  emits: ['submit', 'cancel', 'close', 'action', 'toast', 'reset', 'special-action'],
   setup(props, { emit }) {
     const router = useRouter()
     const inputValues = ref([])
@@ -575,6 +575,15 @@ export default {
         
         console.log('执行源内搜索:', searchParams)
         showToast('正在执行源内搜索...', 'info')
+        
+        // 触发special-action事件，传递给父组件处理
+        emit('special-action', '__self_search__', {
+          tid: searchParams.tid,
+          name: searchParams.name,
+          type_id: searchParams.tid,
+          type_name: searchParams.name,
+          actionData: searchParams
+        })
         
       } catch (error) {
         console.error('源内搜索失败:', error)
