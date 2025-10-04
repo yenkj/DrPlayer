@@ -70,7 +70,7 @@ import { showToast } from '@/stores/toast.js'
 const InputAction = defineAsyncComponent(() => import('./InputAction.vue'))
 const MultiInputAction = defineAsyncComponent(() => import('./MultiInputAction.vue'))
 const MenuAction = defineAsyncComponent(() => import('./MenuAction.vue'))
-const SelectAction = defineAsyncComponent(() => import('./SelectAction.vue'))
+
 const MsgBoxAction = defineAsyncComponent(() => import('./MsgBoxAction.vue'))
 const WebViewAction = defineAsyncComponent(() => import('./WebViewAction.vue'))
 const HelpAction = defineAsyncComponent(() => import('./HelpAction.vue'))
@@ -82,7 +82,6 @@ export default {
     InputAction,
     MultiInputAction,
     MenuAction,
-    SelectAction,
     MsgBoxAction,
     WebViewAction,
     HelpAction
