@@ -5,7 +5,12 @@
     :width="config.width || 420"
     :height="config.height"
     :canceled-on-touch-outside="!config.keep"
+    :module="module"
+    :extend="extend"
+    :api-url="apiUrl"
     @close="handleCancel"
+    @toast="(message, type) => emit('toast', message, type)"
+    @reset="() => emit('reset')"
   >
     <div class="input-action-modern">
       <!-- 消息文本 -->
@@ -903,7 +908,6 @@ export default {
       valueObject[actionId] = value
 
       const actionData = {
-        ac: 'list',
         action,
         value: JSON.stringify(valueObject)
       }

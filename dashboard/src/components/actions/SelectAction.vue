@@ -5,7 +5,12 @@
     :width="config.width || 450"
     :height="config.height"
     :canceled-on-touch-outside="!config.keep"
+    :module="module"
+    :extend="extend"
+    :api-url="apiUrl"
     @close="handleCancel"
+    @toast="$emit('toast', $event)"
+    @reset="$emit('reset', $event)"
   >
     <div class="select-action-modern">
       <!-- 消息区域 -->
@@ -309,9 +314,22 @@ export default {
     visible: {
       type: Boolean,
       default: true
+    },
+    // T4接口调用相关属性
+    module: {
+      type: String,
+      default: ''
+    },
+    extend: {
+      type: Object,
+      default: () => ({})
+    },
+    apiUrl: {
+      type: String,
+      default: ''
     }
   },
-  emits: ['submit', 'cancel', 'close', 'action'],
+  emits: ['submit', 'cancel', 'close', 'action', 'toast', 'reset'],
   setup(props, { emit }) {
     const selectedOption = ref(null)
     const selectedOptions = ref([])

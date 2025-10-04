@@ -2,10 +2,15 @@
   <ActionDialog
     :visible="visible"
     :title="config.title"
-    :width="config.width || 480"
+    :width="config.width || 720"
     :height="config.height"
     :canceled-on-touch-outside="!config.keep"
+    :module="module"
+    :extend="extend"
+    :api-url="apiUrl"
     @close="handleCancel"
+    @toast="$emit('toast', $event)"
+    @reset="$emit('reset', $event)"
   >
     <div class="menu-action-modern">
       <!-- 消息区域 -->
@@ -216,7 +221,7 @@
     </div>
 
     <template #footer>
-      <div class="footer-actions">
+      <div class="modern-footer">
         <!-- 取消按钮 -->
         <button
           v-if="showCancelButton"
@@ -248,6 +253,9 @@ import {
   parseSelectData,
   normalizeButtonType 
 } from './types.js'
+import { executeAction } from '@/api/modules/module.js'
+import { showToast } from '@/stores/toast.js'
+import { useRouter } from 'vue-router'
 
 export default {
   name: 'MenuAction',
@@ -262,10 +270,24 @@ export default {
     visible: {
       type: Boolean,
       default: true
+    },
+    // T4接口调用相关属性
+    module: {
+      type: String,
+      default: ''
+    },
+    extend: {
+      type: Object,
+      default: () => ({})
+    },
+    apiUrl: {
+      type: String,
+      default: ''
     }
   },
-  emits: ['submit', 'cancel', 'close', 'action'],
+  emits: ['submit', 'cancel', 'close', 'action', 'toast', 'reset'],
   setup(props, { emit }) {
+    const router = useRouter()
     const selectedOptions = ref([])
     const searchKeyword = ref('')
     const timeLeft = ref(0)
@@ -393,21 +415,170 @@ export default {
       return emojiRegex.test(str)
     }
 
-    const handleSubmit = () => {
+    // T4接口调用方法
+    const callT4Action = async (action, value) => {
+      if (!props.module && !props.apiUrl) {
+        console.warn('未提供module或apiUrl，无法调用T4接口')
+        return null
+      }
+
+      const actionData = {
+        action,
+        value: value
+      }
+
+      // 添加扩展参数
+      if (props.extend && props.extend.ext) {
+        actionData.extend = props.extend.ext
+      }
+
+      // 添加API URL
+      if (props.apiUrl) {
+        actionData.apiUrl = props.apiUrl
+      }
+
+      console.log('MenuAction调用T4接口:', {
+        module: props.module,
+        actionData,
+        apiUrl: props.apiUrl
+      })
+
+      let result = null
+      if (props.module) {
+        console.log('调用模块:', props.module)
+        result = await executeAction(props.module, actionData)
+      } else if (props.apiUrl) {
+        // 直接调用API
+        console.log('直接调用API:', props.apiUrl)
+        const axios = (await import('axios')).default
+        const response = await axios.post(props.apiUrl, actionData, {
+          timeout: 30000,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        })
+        result = response.data
+      }
+
+      console.log('T4接口返回结果:', result)
+      return result
+    }
+
+    const handleSubmit = async () => {
       if (!isValid.value) return
 
       const result = {}
+      let value = ''
       
       if (isMultiSelect.value) {
         result.selectedValues = selectedOptions.value.map(option => option.value)
         result.selectedOptions = selectedOptions.value
+        // 多选模式下，将选中的值数组转换为字符串传递给T4接口
+        value = result.selectedValues.join(',')
       } else {
         const selected = selectedOptions.value[0]
         result.selectedValue = selected.value
+        value = selected.value
         result.selectedOption = selected
       }
 
+      // 调用T4接口
+      if (props.config.actionId) {
+        try {
+          console.log('菜单选择T4接口调用:', props.config.actionId, value)
+          const response = await callT4Action(props.config.actionId, value)
+          
+          // 检查响应是否为普通文本
+          if (typeof response === 'string') {
+            showToast(response, 'success')
+            emit('close')
+            return
+          }
+          
+          // 处理JSON格式的专项动作响应
+          if (response && response.action) {
+            const actionData = response.action
+            const toastData = response.toast
+            
+            if (toastData) {
+              showToast(toastData, 'success')
+            }
+            
+            switch (actionData.actionId) {
+              case '__keep__':
+                if (actionData.msg) {
+                  // 更新消息内容
+                  console.log('保持弹窗打开，更新消息:', actionData.msg)
+                }
+                if (actionData.reset) {
+                  // 重置选择
+                  selectedOptions.value = []
+                  searchKeyword.value = ''
+                }
+                // 不关闭弹窗
+                return
+                
+              case '__close__':
+                if (actionData.msg) {
+                  showToast(actionData.msg, 'info')
+                }
+                emit('close')
+                return
+                
+              case '__refresh_list__':
+                // 刷新列表
+                handleRefreshListAction(actionData)
+                emit('close')
+                return
+                
+              default:
+                console.warn('未知的专项动作:', actionData.actionId)
+                break
+            }
+          }
+        } catch (error) {
+          console.error('菜单选择T4接口调用失败:', error)
+          showToast('操作失败，请重试', 'error')
+          return
+        }
+      }
+
       emit('submit', result)
+    }
+
+    // 处理刷新列表动作
+    const handleRefreshListAction = async (actionData) => {
+      try {
+        console.log('执行刷新列表:', actionData)
+        
+        const currentRoute = router.currentRoute.value
+        const routeName = currentRoute.name
+        
+        switch (routeName) {
+          case 'Video':
+            window.dispatchEvent(new CustomEvent('refreshVideoList', {
+              detail: actionData
+            }))
+            showToast('视频列表已刷新', 'success')
+            break
+            
+          case 'Live':
+            window.dispatchEvent(new CustomEvent('refreshLiveList', {
+              detail: actionData
+            }))
+            showToast('直播列表已刷新', 'success')
+            break
+            
+          default:
+            showToast('列表已刷新', 'success')
+            break
+        }
+        
+      } catch (error) {
+        console.error('刷新列表失败:', error)
+        showToast('刷新列表失败', 'error')
+      }
     }
 
     const handleCancel = () => {
@@ -560,7 +731,7 @@ export default {
 
 .media-container {
   position: relative;
-  padding: 1rem;
+  padding: 0.75rem;
   border-radius: 0.75rem;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -609,22 +780,31 @@ export default {
 .search-input {
   width: 100%;
   padding: 0.75rem 0.75rem 0.75rem 2.5rem;
-  border: 2px solid var(--action-color-border);
-  border-radius: 0.75rem;
-  background: var(--action-color-bg);
-  color: var(--action-color-text);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--ds-radius-lg);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  color: rgba(0, 0, 0, 0.85);
   font-size: 0.875rem;
-  transition: all var(--action-transition-duration);
+  font-weight: 500;
+  transition: all var(--ds-duration-fast) ease;
   outline: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .search-input:focus {
-  border-color: var(--action-color-primary);
-  box-shadow: 0 0 0 3px rgba(var(--action-color-primary-rgb), 0.1);
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 
+    0 0 0 4px rgba(59, 130, 246, 0.1),
+    0 8px 25px rgba(59, 130, 246, 0.15);
+  transform: translateY(-1px);
 }
 
 .search-input::placeholder {
-  color: var(--action-color-text-secondary);
+  color: rgba(0, 0, 0, 0.4);
+  font-weight: 400;
 }
 
 /* 菜单选项区域 */
@@ -633,9 +813,9 @@ export default {
 }
 
 .menu-options-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.625rem;
   max-height: 400px;
   overflow-y: auto;
   padding-right: 0.25rem;
@@ -663,14 +843,17 @@ export default {
 .menu-option-card {
   display: flex;
   align-items: center;
-  padding: 1rem;
-  border: 2px solid var(--action-color-border);
-  border-radius: 0.75rem;
-  background: var(--action-color-bg);
+  padding: 0.75rem;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--ds-radius-lg);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
   cursor: pointer;
-  transition: all var(--action-transition-duration);
+  transition: all var(--ds-duration-fast) ease;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .menu-option-card::before {
@@ -681,10 +864,10 @@ export default {
   right: 0;
   bottom: 0;
   background: linear-gradient(135deg, 
-    rgba(var(--action-color-primary-rgb), 0.05) 0%, 
-    rgba(var(--action-color-secondary-rgb), 0.05) 100%);
+    rgba(59, 130, 246, 0.1) 0%, 
+    rgba(147, 51, 234, 0.1) 100%);
   opacity: 0;
-  transition: opacity var(--action-transition-duration);
+  transition: opacity var(--ds-duration-fast) ease;
   z-index: 0;
 }
 
@@ -693,15 +876,16 @@ export default {
 }
 
 .menu-option-card:hover {
-  border-color: var(--action-color-primary);
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(255, 255, 255, 0.95);
   transform: translateY(-2px);
-  box-shadow: var(--action-shadow-large);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
 }
 
 .menu-option-card.selected {
-  border-color: var(--action-color-primary);
-  background: rgba(var(--action-color-primary-rgb), 0.05);
-  box-shadow: var(--action-shadow-medium);
+  border-color: rgb(59, 130, 246);
+  background: rgba(59, 130, 246, 0.1);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
 }
 
 .menu-option-card.selected::before {
@@ -791,16 +975,22 @@ export default {
 .option-title {
   font-weight: 600;
   color: var(--action-color-text);
-  margin-bottom: 0.125rem;
-  font-size: 0.875rem;
-  line-height: 1.4;
+  margin-bottom: 0.0625rem;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .option-description {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--action-color-text-secondary);
-  line-height: 1.4;
-  margin-top: 0.25rem;
+  line-height: 1.2;
+  margin-top: 0.125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 选择指示器 */
@@ -907,11 +1097,12 @@ export default {
 .multi-select-controls {
   margin-top: 1rem;
   padding: 1rem;
-  background: var(--glass-bg-light);
-  backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .control-buttons {
@@ -926,29 +1117,55 @@ export default {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: var(--glass-bg-primary);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.9) 0%, rgba(37, 99, 235, 0.9) 100%);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--ds-radius-md);
+  color: white;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--shadow-sm);
+  transition: all var(--ds-duration-fast) ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.control-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left var(--ds-duration-normal) ease;
 }
 
 .control-btn:hover:not(:disabled) {
-  background: var(--gradient-primary);
-  color: white;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 1) 0%, rgba(37, 99, 235, 1) 100%);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.control-btn:hover:not(:disabled)::before {
+  left: 100%;
+}
+
+.control-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .control-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+  background: rgba(156, 163, 175, 0.5);
+  border-color: rgba(156, 163, 175, 0.3);
+  box-shadow: none;
 }
 
 .control-btn svg {
@@ -1090,48 +1307,47 @@ export default {
   border-radius: 0.125rem;
 }
 
-/* 底部操作区域 */
-.footer-actions {
+/* 现代化底部 */
+.modern-footer {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 0.75rem;
   margin: 0;
   padding: 0;
 }
 
-/* 现代化按钮样式 */
 .btn-modern {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
   border: 2px solid transparent;
-  border-radius: 0.75rem;
+  border-radius: var(--ds-radius-lg);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--action-transition-duration);
-  outline: none;
+  transition: all var(--ds-duration-fast) ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   position: relative;
   overflow: hidden;
-  min-width: 5rem;
 }
 
 .btn-modern::before {
   content: '';
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
-  opacity: 0;
-  transition: opacity var(--action-transition-duration);
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
 }
 
 .btn-modern:hover::before {
-  opacity: 1;
+  left: 100%;
 }
 
 .btn-modern span {
@@ -1140,41 +1356,56 @@ export default {
 }
 
 .btn-secondary {
-  background: var(--action-color-bg-secondary);
-  border-color: var(--action-color-border);
-  color: var(--action-color-text);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(0, 0, 0, 0.8);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .btn-secondary:hover {
-  border-color: var(--action-color-text-secondary);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 100%);
+  border-color: rgba(255, 255, 255, 0.3);
   transform: translateY(-2px);
-  box-shadow: var(--action-shadow-medium);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary {
-  background: var(--action-color-primary);
-  border-color: var(--action-color-primary);
+  background: linear-gradient(135deg, rgb(59, 130, 246) 0%, rgb(37, 99, 235) 100%);
+  border-color: rgb(59, 130, 246);
   color: white;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
 }
 
 .btn-primary:hover {
-  background: var(--action-color-primary-dark);
-  border-color: var(--action-color-primary-dark);
+  background: linear-gradient(135deg, rgb(37, 99, 235) 0%, rgb(29, 78, 216) 100%);
+  border-color: rgb(37, 99, 235);
   transform: translateY(-2px);
-  box-shadow: var(--action-shadow-large);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
 }
 
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+.btn-modern.disabled,
 .btn-primary:disabled {
-  background: var(--action-color-bg-secondary);
-  border-color: var(--action-color-border);
-  color: var(--action-color-text-secondary);
+  background: linear-gradient(135deg, rgba(156, 163, 175, 0.5) 0%, rgba(107, 114, 128, 0.5) 100%);
+  border-color: rgba(156, 163, 175, 0.3);
+  color: rgba(156, 163, 175, 0.8);
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
+.btn-modern.disabled::before,
 .btn-primary:disabled::before {
-  opacity: 0;
+  display: none;
 }
 
 /* 响应式设计 */
@@ -1201,7 +1432,7 @@ export default {
     justify-content: space-between;
   }
   
-  .footer-actions {
+  .modern-footer {
     flex-direction: column-reverse;
   }
   

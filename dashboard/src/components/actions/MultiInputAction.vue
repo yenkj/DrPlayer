@@ -5,7 +5,12 @@
     :width="config.width || 600"
     :height="config.height"
     :canceled-on-touch-outside="!config.keep"
+    :module="module"
+    :extend="extend"
+    :api-url="apiUrl"
     @close="handleCancel"
+    @toast="(message, type) => emit('toast', message, type)"
+    @reset="() => emit('reset')"
   >
     <div class="multi-input-action-modern">
       <!-- 消息区域 -->
@@ -459,13 +464,31 @@ export default {
 
     // T4接口调用
     const callT4Action = async (actionId, inputData) => {
+      if (!props.module && !props.apiUrl) {
+        console.warn('未提供module或apiUrl，无法调用T4接口')
+        return null
+      }
       try {
-        const response = await executeAction(props.module, {
-          action: actionId,
-          value: JSON.stringify(inputData),
-          extend: props.extend,
+        const actionData = {
+          action:actionId,
+          value: JSON.stringify(inputData)
+        }
+        // 添加扩展参数
+        if (props.extend && props.extend.ext) {
+          actionData.extend = props.extend.ext
+        }
+
+        // 添加API URL
+        if (props.apiUrl) {
+          actionData.apiUrl = props.apiUrl
+        }
+        console.log('InputAction调用T4接口:', {
+          module: props.module,
+          actionData,
           apiUrl: props.apiUrl
         })
+
+        const response = await executeAction(props.module, actionData)
         return response
       } catch (error) {
         console.error('T4接口调用失败:', error)
