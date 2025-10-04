@@ -240,6 +240,17 @@
                   </template>
                 </a-input>
                 <div class="address-config-actions">
+                  <a-button 
+                    type="text" 
+                    @click="downloadProxyPlayer"
+                    size="medium"
+                    class="download-btn"
+                    title="下载代理播放器"
+                  >
+                    <template #icon>
+                      <icon-download />
+                    </template>
+                  </a-button>
                   <AddressHistory 
                     ref="proxyPlayHistory"
                     config-key="proxy-play"
@@ -313,6 +324,17 @@
                   </template>
                 </a-input>
                 <div class="address-config-actions">
+                  <a-button 
+                    type="text" 
+                    @click="downloadProxySniffer"
+                    size="medium"
+                    class="download-btn"
+                    title="下载代理嗅探器"
+                  >
+                    <template #icon>
+                      <icon-download />
+                    </template>
+                  </a-button>
                   <AddressHistory 
                     ref="proxySniffHistory"
                     config-key="proxy-sniff"
@@ -826,6 +848,7 @@ import {
   IconImage,
   IconClockCircle,
   IconComputer,
+  IconDownload,
   IconCode
 } from '@arco-design/web-vue/es/icon'
 import AddressHistory from '@/components/AddressHistory.vue'
@@ -1260,6 +1283,20 @@ const handleProxyPlayEnabledChange = (enabled) => {
   }))
   
   console.log('代理播放开关状态已更改:', enabled)
+}
+
+// 下载代理播放器
+const downloadProxyPlayer = () => {
+  const url = 'https://wwvy.lanzouo.com/i527V37opr4b'
+  window.open(url, '_blank')
+  Message.success('正在打开代理播放器下载页面')
+}
+
+// 下载代理嗅探器
+const downloadProxySniffer = () => {
+  const url = 'https://wwvy.lanzouo.com/ijPuF37oo10f'
+  window.open(url, '_blank')
+  Message.success('正在打开代理嗅探器下载页面')
 }
 
 // 注释：已删除 getConfigKey 函数，改为直接使用 ref 引用
