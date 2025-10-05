@@ -822,16 +822,7 @@
     <About v-model:visible="aboutModalVisible" />
 
     <!-- 直达底部按钮 -->
-    <transition name="scroll-btn-fade">
-      <div 
-        v-show="showScrollToBottomBtn"
-        class="scroll-to-bottom-btn"
-        @click="scrollToBottom"
-        title="直达底部"
-      >
-        <icon-down class="scroll-btn-icon" />
-      </div>
-    </transition>
+    <ScrollToBottom :target="settingsContainer" />
   </div>
 </template>
 
@@ -869,13 +860,13 @@ import {
   IconClockCircle,
   IconComputer,
   IconDownload,
-  IconCode,
-  IconDown
+  IconCode
 } from '@arco-design/web-vue/es/icon'
 import AddressHistory from '@/components/AddressHistory.vue'
 import PlayerSelector from '@/components/PlayerSelector.vue'
 import BackupRestoreDialog from '@/components/BackupRestoreDialog.vue'
 import About from '@/components/About.vue'
+import ScrollToBottom from '@/components/ScrollToBottom.vue'
 import configService from '@/api/services/config'
 import siteService from '@/api/services/site'
 import { factoryResetWithConfirmation } from '@/services/resetService'
@@ -964,8 +955,6 @@ const backupRestoreVisible = ref(false)
 // 关于弹窗状态
 const aboutModalVisible = ref(false)
 
-// 直达底部按钮状态
-const showScrollToBottomBtn = ref(false)
 const settingsContainer = ref(null)
 
 // 保存地址配置
@@ -1536,34 +1525,11 @@ const saveSettings = () => {
 // 监听设置项变化并自动保存
 watch(settings, saveSettings, { deep: true })
 
-// 滚动到底部函数
-const scrollToBottom = () => {
-  if (settingsContainer.value) {
-    settingsContainer.value.scrollTo({
-      top: settingsContainer.value.scrollHeight,
-      behavior: 'smooth'
-    })
-  }
-}
 
-// 滚动监听函数
-const handleScroll = () => {
-  if (settingsContainer.value) {
-    const { scrollTop, scrollHeight, clientHeight } = settingsContainer.value
-    // 当滚动距离超过200px时显示按钮，当接近底部时隐藏按钮
-    const showButton = scrollTop > 200 && (scrollTop + clientHeight < scrollHeight - 100)
-    showScrollToBottomBtn.value = showButton
-  }
-}
 
 // 初始化
 onMounted(async () => {
   await loadConfig()
-  
-  // 添加滚动监听
-  if (settingsContainer.value) {
-    settingsContainer.value.addEventListener('scroll', handleScroll)
-  }
 })
 </script>
 
@@ -2129,75 +2095,4 @@ onMounted(async () => {
 
 
 
-/* 直达底部按钮样式 */
-.scroll-to-bottom-btn {
-  position: fixed;
-  right: 24px;
-  bottom: 80px;
-  width: 48px;
-  height: 48px;
-  background: #6366f1;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-  transition: all 0.3s ease;
-  z-index: 1000;
-  user-select: none;
-}
-
-.scroll-to-bottom-btn:hover {
-  background: #5855eb;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
-}
-
-.scroll-to-bottom-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
-}
-
-.scroll-btn-icon {
-  font-size: 20px;
-  color: white;
-  transition: transform 0.3s ease;
-}
-
-.scroll-to-bottom-btn:hover .scroll-btn-icon {
-  transform: translateY(2px);
-}
-
-/* 按钮淡入淡出动画 */
-.scroll-btn-fade-enter-active,
-.scroll-btn-fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.scroll-btn-fade-enter-from,
-.scroll-btn-fade-leave-to {
-  opacity: 0;
-  transform: translateY(20px) scale(0.8);
-}
-
-.scroll-btn-fade-enter-to,
-.scroll-btn-fade-leave-from {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .scroll-to-bottom-btn {
-    right: 16px;
-    bottom: 70px;
-    width: 44px;
-    height: 44px;
-  }
-  
-  .scroll-btn-icon {
-    font-size: 18px;
-  }
-}
 </style>
