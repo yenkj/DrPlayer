@@ -153,7 +153,7 @@ const props = defineProps({
     default: ''
   },
   extend: {
-    type: Object,
+    type: [Object, String],
     default: () => ({})
   },
   apiUrl: {
@@ -680,7 +680,8 @@ const handleFolderNavigateFromGrid = async (video) => {
     };
     
     emit('folder-navigate', loadingState);
-    
+    console.log('props.extend:',props.extend)
+    console.log('processExtendParam(props.extend):',processExtendParam(props.extend))
     // 调用T4分类接口
     const response = await getCategoryData(props.module, {
       t: video.vod_id, // 使用vod_id作为type_id

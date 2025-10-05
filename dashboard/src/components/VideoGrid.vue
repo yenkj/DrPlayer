@@ -105,7 +105,7 @@ const props = defineProps({
     default: ''
   },
   extend: {
-    type: Object,
+    type: [Object, String],
     default: () => ({})
   },
   apiUrl: {
