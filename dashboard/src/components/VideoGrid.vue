@@ -243,73 +243,96 @@ const handleT4ActionCall = async (actionName) => {
   }
 };
 
+let isUpdatingHeight = false;
+
 const updateScrollAreaHeight = () => {
+  // 防止递归调用
+  if (isUpdatingHeight) {
+    return;
+  }
+  
+  isUpdatingHeight = true;
+  
   nextTick(() => {
     setTimeout(() => {
-      const container = containerRef.value;
-      if (!container) return;
+      try {
+        const container = containerRef.value;
+        if (!container) {
+          isUpdatingHeight = false;
+          return;
+        }
 
-      // 查找父级内容区域
-      const contentArea = container.closest('.content-area') || container.parentElement;
-      const footer = container.querySelector('.stats-footer');
-      const footerHeight = (props.showStats && footer) ? footer.offsetHeight : 0;
+        // 查找父级内容区域
+        const contentArea = container.closest('.content-area') || container.parentElement;
+        const footer = container.querySelector('.stats-footer');
+        const footerHeight = (props.showStats && footer) ? footer.offsetHeight : 0;
 
-      // 查找CategoryNavigation组件来获取其实际高度
-      const categoryNav = document.querySelector('.category-nav-container');
-      const categoryNavHeight = categoryNav ? categoryNav.offsetHeight : 0;
+        // 查找CategoryNavigation组件来获取其实际高度
+        const categoryNav = document.querySelector('.category-nav-container');
+        const categoryNavHeight = categoryNav ? categoryNav.offsetHeight : 0;
 
-      let containerHeight = contentArea ? contentArea.offsetHeight : 0;
-      if (containerHeight <= 0) {
-        // 备用方案：使用窗口高度减去导航栏等固定元素高度
-        // 考虑到CategoryNavigation的高度变化
-        const baseHeight = Math.max(window.innerHeight - 120, 500);
-        containerHeight = baseHeight;
+        let containerHeight = contentArea ? contentArea.offsetHeight : 0;
+        if (containerHeight <= 0) {
+          // 备用方案：使用窗口高度减去导航栏等固定元素高度
+          // 考虑到CategoryNavigation的高度变化
+          const baseHeight = Math.max(window.innerHeight - 120, 500);
+          containerHeight = baseHeight;
+        }
+
+        console.log(`CategoryNavigation高度: ${categoryNavHeight}px, 内容区域高度: ${containerHeight}px`);
+
+        // 改进的高度计算逻辑：
+        // 1. 正确计算网格列数（基于容器宽度）
+        // 2. 估算内容实际需要的高度
+        // 3. 智能调整容器高度以确保滚动翻页正常工作
+        
+        const videoCount = props.videos ? props.videos.length : 0;
+        
+        // 获取容器宽度来计算列数
+        const containerWidth = container.offsetWidth || Math.max(window.innerWidth - 240, 800); // 减去侧边栏宽度
+        const itemWidth = 200; // 每个视频项的估算宽度
+        const gridCols = Math.min(Math.floor(containerWidth / itemWidth), 8); // 基于宽度计算列数，最多8列
+        
+        const estimatedItemHeight = 328; // 根据F12实际测量的高度（图片+文字）
+        const estimatedRows = videoCount > 0 ? Math.ceil(videoCount / Math.max(gridCols, 1)) : 0;
+        const estimatedContentHeight = estimatedRows * estimatedItemHeight + 16; // 减少padding估算
+        
+        // 智能高度调整策略 - 考虑CategoryNavigation的动态高度
+        let heightReduction = 4; // 默认只减去少量padding
+        
+        // 如果没有视频数据，使用保守的高度减值来为后续数据加载预留空间
+        if (videoCount === 0) {
+          // 对于空数据，需要确保有足够的滚动空间来触发翻页
+          // 减去更多高度以确保滚动条出现
+          heightReduction = Math.min(containerHeight * 0.4, 300); // 增加减值比例
+          console.log(`无视频数据，使用保守高度减值: ${heightReduction}px`);
+        } else if (estimatedContentHeight < containerHeight) {
+          // 有数据但内容不足时，需要减少容器高度以触发滚动
+          // 策略：容器高度 = 内容高度 - 150px（确保有足够滚动空间）
+          const minDisplayHeight = Math.floor(estimatedItemHeight * 1.2) + 60; // 至少显示1.2行
+          const idealHeight = estimatedContentHeight - 5; // 增加滚动空间
+          const targetHeight = Math.max(idealHeight, minDisplayHeight, containerHeight * 0.3); // 降低最小比例
+          heightReduction = Math.max(containerHeight - targetHeight, 50); // 增加最小减值
+          console.log(`内容高度不足，估算内容高度: ${estimatedContentHeight}px, 理想高度: ${idealHeight}px, 最小显示高度: ${minDisplayHeight}px, 容器高度: ${containerHeight}px, 调整高度减值: ${heightReduction}px`);
+        } else {
+          // 内容充足时，减少一些高度确保滚动正常
+          heightReduction = Math.min(containerHeight * 0.02, 20);
+          console.log(`内容充足，使用标准高度减值: ${heightReduction}px`);
+        }
+        
+        const newHeight = Math.max(containerHeight - footerHeight - heightReduction, 250); // 降低最小高度
+        
+        // 只有当高度真正发生变化时才更新
+        if (Math.abs(scrollAreaHeight.value - newHeight) > 5) {
+          scrollAreaHeight.value = newHeight;
+        }
+        
+        console.log(`视频数量: ${videoCount}, 估算行数: ${estimatedRows}, 列数: ${gridCols}, 容器宽度: ${containerWidth}px, 最终高度: ${newHeight}px`);
+      } catch (error) {
+        console.warn('updateScrollAreaHeight error:', error);
+      } finally {
+        isUpdatingHeight = false;
       }
-
-      console.log(`CategoryNavigation高度: ${categoryNavHeight}px, 内容区域高度: ${containerHeight}px`);
-
-      // 改进的高度计算逻辑：
-      // 1. 正确计算网格列数（基于容器宽度）
-      // 2. 估算内容实际需要的高度
-      // 3. 智能调整容器高度以确保滚动翻页正常工作
-      
-      const videoCount = props.videos ? props.videos.length : 0;
-      
-      // 获取容器宽度来计算列数
-      const containerWidth = container.offsetWidth || Math.max(window.innerWidth - 240, 800); // 减去侧边栏宽度
-      const itemWidth = 200; // 每个视频项的估算宽度
-      const gridCols = Math.min(Math.floor(containerWidth / itemWidth), 8); // 基于宽度计算列数，最多8列
-      
-      const estimatedItemHeight = 328; // 根据F12实际测量的高度（图片+文字）
-      const estimatedRows = videoCount > 0 ? Math.ceil(videoCount / Math.max(gridCols, 1)) : 0;
-      const estimatedContentHeight = estimatedRows * estimatedItemHeight + 16; // 减少padding估算
-      
-      // 智能高度调整策略 - 考虑CategoryNavigation的动态高度
-      let heightReduction = 4; // 默认只减去少量padding
-      
-      // 如果没有视频数据，使用保守的高度减值来为后续数据加载预留空间
-      if (videoCount === 0) {
-        // 对于空数据，需要确保有足够的滚动空间来触发翻页
-        // 减去更多高度以确保滚动条出现
-        heightReduction = Math.min(containerHeight * 0.4, 300); // 增加减值比例
-        console.log(`无视频数据，使用保守高度减值: ${heightReduction}px`);
-      } else if (estimatedContentHeight < containerHeight) {
-        // 有数据但内容不足时，需要减少容器高度以触发滚动
-        // 策略：容器高度 = 内容高度 - 150px（确保有足够滚动空间）
-        const minDisplayHeight = Math.floor(estimatedItemHeight * 1.2) + 60; // 至少显示1.2行
-        const idealHeight = estimatedContentHeight - 5; // 增加滚动空间
-        const targetHeight = Math.max(idealHeight, minDisplayHeight, containerHeight * 0.3); // 降低最小比例
-        heightReduction = Math.max(containerHeight - targetHeight, 50); // 增加最小减值
-        console.log(`内容高度不足，估算内容高度: ${estimatedContentHeight}px, 理想高度: ${idealHeight}px, 最小显示高度: ${minDisplayHeight}px, 容器高度: ${containerHeight}px, 调整高度减值: ${heightReduction}px`);
-      } else {
-        // 内容充足时，减少一些高度确保滚动正常
-        heightReduction = Math.min(containerHeight * 0.02, 20);
-        console.log(`内容充足，使用标准高度减值: ${heightReduction}px`);
-      }
-      
-      const newHeight = Math.max(containerHeight - footerHeight - heightReduction, 250); // 降低最小高度
-      console.log(`视频数量: ${videoCount}, 估算行数: ${estimatedRows}, 列数: ${gridCols}, 容器宽度: ${containerWidth}px, 最终高度: ${newHeight}px`);
-      scrollAreaHeight.value = newHeight;
     }, 100); // 增加延迟确保DOM完全渲染
   });
 };
@@ -331,22 +354,37 @@ const handleScroll = (e) => {
 };
 
 // 检测文本是否超出容器宽度
+let isCheckingOverflow = false;
+
 const checkTextOverflow = () => {
+  // 防止递归调用
+  if (isCheckingOverflow) {
+    return;
+  }
+  
+  isCheckingOverflow = true;
+  
   nextTick(() => {
     setTimeout(() => {
-      const titleElements = document.querySelectorAll('.video_list_item_title .title-text');
-      titleElements.forEach(element => {
-        const container = element.parentElement;
-        const containerWidth = container.offsetWidth - 16; // 减去padding
-        const textWidth = element.scrollWidth;
-        
-        // 如果文本宽度超过容器宽度，添加overflow属性启用跑马灯
-        if (textWidth > containerWidth) {
-          element.setAttribute('data-overflow', 'true');
-        } else {
-          element.removeAttribute('data-overflow');
-        }
-      });
+      try {
+        const titleElements = document.querySelectorAll('.video_list_item_title .title-text');
+        titleElements.forEach(element => {
+          const container = element.parentElement;
+          const containerWidth = container.offsetWidth - 16; // 减去padding
+          const textWidth = element.scrollWidth;
+          
+          // 如果文本宽度超过容器宽度，添加overflow属性启用跑马灯
+          if (textWidth > containerWidth) {
+            element.setAttribute('data-overflow', 'true');
+          } else {
+            element.removeAttribute('data-overflow');
+          }
+        });
+      } catch (error) {
+        console.warn('checkTextOverflow error:', error);
+      } finally {
+        isCheckingOverflow = false;
+      }
     }, 100); // 延迟确保DOM渲染完成
   });
 };
@@ -360,11 +398,20 @@ onMounted(() => {
   const observeFilterChanges = () => {
     const categoryNav = document.querySelector('.category-nav-container');
     if (categoryNav && containerRef.value) {
+      let observerTimer = null;
+      
       const observer = new MutationObserver(() => {
-        // 延迟执行以确保DOM更新完成
-        setTimeout(() => {
-          updateScrollAreaHeight();
-        }, 100);
+        // 防抖处理，避免频繁触发
+        if (observerTimer) {
+          clearTimeout(observerTimer);
+        }
+        
+        observerTimer = setTimeout(() => {
+          // 只有当组件还存在时才执行更新
+          if (containerRef.value && !isUpdatingHeight) {
+            updateScrollAreaHeight();
+          }
+        }, 200);
       });
       
       observer.observe(categoryNav, {
@@ -392,11 +439,34 @@ onBeforeUnmount(() => {
   }
 });
 
-// 当视频数据或显示统计信息变化时，更新高度和检测文本溢出
-watch(() => [props.videos, props.showStats], () => {
-  updateScrollAreaHeight();
-  checkTextOverflow();
-});
+// 监听videos变化，重新计算高度和检查文本溢出
+// 使用防抖和条件检查避免递归更新
+let updateTimer = null;
+let lastVideosLength = 0;
+let lastShowStats = false;
+
+watch([() => props.videos, () => props.showStats], ([newVideos, newShowStats]) => {
+  // 避免不必要的更新
+  if (newVideos.length === lastVideosLength && newShowStats === lastShowStats) {
+    return;
+  }
+  
+  lastVideosLength = newVideos.length;
+  lastShowStats = newShowStats;
+  
+  // 清除之前的定时器
+  if (updateTimer) {
+    clearTimeout(updateTimer);
+  }
+  
+  // 使用防抖避免频繁更新
+  updateTimer = setTimeout(() => {
+    nextTick(() => {
+      checkTextOverflow();
+      updateScrollAreaHeight();
+    });
+  }, 100);
+}, { deep: true });
 
 // 滚动位置恢复方法
 const restoreScrollPosition = (scrollPosition) => {
