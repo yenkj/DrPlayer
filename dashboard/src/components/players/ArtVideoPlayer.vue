@@ -472,7 +472,6 @@ const initArtPlayer = async (url) => {
         {
           position: 'right',
           html: availableQualities.value.length > 1 ? `画质: ${getCurrentQualityLabel.value}` : '',
-          tooltip: availableQualities.value.length > 1 ? '选择画质' : '',
           style: availableQualities.value.length > 1 ? {} : { display: 'none' },
           selector: availableQualities.value.length > 1 ? availableQualities.value.map(q => ({
             html: q.name || '未知',
@@ -1356,6 +1355,17 @@ onUnmounted(() => {
 
 :deep(.art-control:hover) {
   color: #23ade5;
+}
+
+/* ArtPlayer selector 弹层位置调整 */
+:deep(.art-selector) {
+  bottom: 45px !important; /* 向上调整弹层位置，避免被遮挡 */
+  margin-bottom: 5px !important;
+}
+
+:deep(.art-control-selector .art-selector) {
+  bottom: 45px !important;
+  margin-bottom: 5px !important;
 }
 
 /* 紧凑按钮组样式 */
