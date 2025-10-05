@@ -861,6 +861,7 @@ import PlayerSelector from '@/components/PlayerSelector.vue'
 import BackupRestoreDialog from '@/components/BackupRestoreDialog.vue'
 import configService from '@/api/services/config'
 import siteService from '@/api/services/site'
+import { factoryResetWithConfirmation } from '@/services/resetService'
 import { 
   getCSPConfig, 
   saveCSPConfig, 
@@ -1370,49 +1371,9 @@ const handlePlayerSelect = (playerType) => {
   Message.success(`已切换到 ${getCurrentPlayerName()}`)
 }
 
-// 重置所有设置到默认状态
-const resetAllSettings = () => {
-  // 重置地址设置
-  Object.assign(addressSettings, {
-    vodConfig: '',
-    liveConfig: '',
-    proxyAccess: '',
-    proxyAccessEnabled: false,
-    proxyPlay: 'http://localhost:57572/proxy?form=base64&url=${url}&headers=${headers}&type=${type}#嗷呜',
-    proxyPlayEnabled: false,
-    proxySniff: 'http://localhost:57573/sniffer',
-    proxySniffEnabled: false
-  })
-  
-  // 重置其他设置
-  Object.assign(settings, {
-    datasourceDisplay: true,
-    windowPreview: true,
-    playerType: 'ijk',
-    adFilter: true,
-    ijkCache: false,
-    autoLive: false,
-    secureDns: false,
-    cspBypass: true,
-    referrerPolicy: 'no-referrer'
-  })
-  
-  // 清除本地存储
-  localStorage.removeItem('addressSettings')
-  localStorage.removeItem('appSettings')
-  
-  // 重置CSP配置
-  try {
-    saveCSPConfig({
-      enabled: true,
-      referrerPolicy: 'no-referrer'
-    })
-    setGlobalReferrerPolicy('no-referrer')
-  } catch (error) {
-    console.error('Failed to reset CSP config:', error)
-  }
-  
-  Message.success('所有设置已重置为默认状态')
+// 执行出厂重置
+const resetAllSettings = async () => {
+  await factoryResetWithConfirmation()
 }
 
 // 处理设置项点击
