@@ -690,6 +690,35 @@ const initQualityData = () => {
   })
 }
 
+// 更新控制栏中的画质文本
+const updateQualityControlText = () => {
+  if (!artPlayerInstance.value) return
+  
+  try {
+    // 通过DOM直接更新
+    const container = artPlayerInstance.value.template.$container
+    if (container) {
+      // 查找控制栏中的画质按钮
+      const controlsRight = container.querySelector('.art-controls-right')
+      if (controlsRight) {
+        const buttons = controlsRight.querySelectorAll('.art-control')
+        // 遍历所有按钮，找到包含"画质"文本的按钮
+        for (let i = 0; i < buttons.length; i++) {
+          const button = buttons[i]
+          if (button.innerHTML.includes('画质')) {
+            const newText = `画质: ${getCurrentQualityLabel.value}`
+            button.innerHTML = newText
+            console.log('更新控制栏画质文本:', newText)
+            return
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('更新控制栏画质文本失败:', error)
+  }
+}
+
 // 处理画质切换
 const handleQualityChange = (qualityName) => {
   const quality = availableQualities.value.find(q => q.name === qualityName)
@@ -712,6 +741,9 @@ const handleQualityChange = (qualityName) => {
   // 更新当前画质和播放URL
   currentQuality.value = qualityName
   currentPlayingUrl.value = quality.url
+  
+  // 更新控制栏中的画质文本
+  updateQualityControlText()
   
   // 触发画质切换事件，让父组件更新videoUrl
   // 父组件更新videoUrl后会触发watch监听器重新初始化播放器
