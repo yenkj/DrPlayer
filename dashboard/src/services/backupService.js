@@ -20,6 +20,7 @@ const BACKUP_KEYS = {
   WATCH_HISTORY: 'drplayer_watch_history',
   DAILY_STATS: 'drplayer_daily_stats',
   WEEKLY_STATS: 'drplayer_weekly_stats',
+  HISTORIES: 'drplayer_histories', // 历史页面数据
   
   // 站点数据
   SITE_STORE: 'siteStore',
@@ -30,6 +31,7 @@ const BACKUP_KEYS = {
   // 其他功能设置
   SKIP_SETTINGS: 'skipSettings',
   PARSER_CONFIG: 'parserConfig',
+  PARSERS: 'drplayer_parsers', // 解析器数据
   SIDEBAR_COLLAPSED: 'sidebarCollapsed',
   PAGE_STATE: 'pageState'
 }
@@ -94,6 +96,29 @@ const setLocalStorageData = (key, data) => {
 }
 
 /**
+ * 收集所有地址配置历史数据
+ */
+const collectAddressHistories = () => {
+  const addressHistories = {}
+  const addressHistoryKeys = [
+    'address-history-vod-config',
+    'address-history-live-config', 
+    'address-history-proxy-access',
+    'address-history-proxy-play',
+    'address-history-proxy-sniff'
+  ]
+  
+  addressHistoryKeys.forEach(key => {
+    const data = getLocalStorageData(key, [])
+    if (data && data.length > 0) {
+      addressHistories[key] = data
+    }
+  })
+  
+  return addressHistories
+}
+
+/**
  * 收集所有需要备份的数据
  */
 export const collectBackupData = () => {
@@ -118,6 +143,8 @@ export const collectBackupData = () => {
       skipSettings: getLocalStorageData(BACKUP_KEYS.SKIP_SETTINGS, {}),
       // 解析器配置
       parserConfig: getLocalStorageData(BACKUP_KEYS.PARSER_CONFIG, {}),
+      // 解析器数据
+      parsers: getLocalStorageData(BACKUP_KEYS.PARSERS, []),
       // 侧边栏状态
       sidebarCollapsed: getLocalStorageData(BACKUP_KEYS.SIDEBAR_COLLAPSED, false),
       // 页面状态
@@ -128,12 +155,16 @@ export const collectBackupData = () => {
     userData: {
       // 收藏列表
       favorites: getLocalStorageData(BACKUP_KEYS.FAVORITES, []),
-      // 观看历史
+      // 观看历史（watchStatsService使用）
       watchHistory: getLocalStorageData(BACKUP_KEYS.WATCH_HISTORY, []),
+      // 历史页面数据（historyStore使用）
+      histories: getLocalStorageData(BACKUP_KEYS.HISTORIES, []),
       // 每日统计
       dailyStats: getLocalStorageData(BACKUP_KEYS.DAILY_STATS, {}),
       // 周统计
-      weeklyStats: getLocalStorageData(BACKUP_KEYS.WEEKLY_STATS, {})
+      weeklyStats: getLocalStorageData(BACKUP_KEYS.WEEKLY_STATS, {}),
+      // 地址配置历史
+      addressHistories: collectAddressHistories()
     },
     
     // 站点和配置数据
@@ -243,21 +274,31 @@ export const restoreBackupData = (backupData) => {
     // 还原设置数据
     if (backupData.settings) {
       for (const [key, value] of Object.entries(backupData.settings)) {
-        const storageKey = Object.values(BACKUP_KEYS).find(k => k.includes(key) || key.includes(k.split('_').pop()))
-        if (storageKey) {
-          if (setLocalStorageData(storageKey, value)) {
+        if (key === 'parsers') {
+          // 特殊处理解析器数据
+          if (setLocalStorageData(BACKUP_KEYS.PARSERS, value)) {
             restoredCount++
           } else {
             failedCount++
-            errors.push(`设置数据 ${key}`)
+            errors.push(`解析器数据`)
           }
         } else {
-          // 直接使用key名称
-          if (setLocalStorageData(key, value)) {
-            restoredCount++
+          const storageKey = Object.values(BACKUP_KEYS).find(k => k.includes(key) || key.includes(k.split('_').pop()))
+          if (storageKey) {
+            if (setLocalStorageData(storageKey, value)) {
+              restoredCount++
+            } else {
+              failedCount++
+              errors.push(`设置数据 ${key}`)
+            }
           } else {
-            failedCount++
-            errors.push(`设置数据 ${key}`)
+            // 直接使用key名称
+            if (setLocalStorageData(key, value)) {
+              restoredCount++
+            } else {
+              failedCount++
+              errors.push(`设置数据 ${key}`)
+            }
           }
         }
       }
@@ -269,13 +310,24 @@ export const restoreBackupData = (backupData) => {
         favorites: BACKUP_KEYS.FAVORITES,
         watchHistory: BACKUP_KEYS.WATCH_HISTORY,
         dailyStats: BACKUP_KEYS.DAILY_STATS,
-        weeklyStats: BACKUP_KEYS.WEEKLY_STATS
+        weeklyStats: BACKUP_KEYS.WEEKLY_STATS,
+        histories: BACKUP_KEYS.HISTORIES // 历史页面数据
       }
       
       for (const [key, value] of Object.entries(backupData.userData)) {
         const storageKey = userDataMapping[key]
         if (storageKey && setLocalStorageData(storageKey, value)) {
           restoredCount++
+        } else if (key === 'addressHistories' && value) {
+          // 还原地址配置历史
+          for (const [historyKey, historyValue] of Object.entries(value)) {
+            if (setLocalStorageData(historyKey, historyValue)) {
+              restoredCount++
+            } else {
+              failedCount++
+              errors.push(`地址配置历史 ${historyKey}`)
+            }
+          }
         } else {
           failedCount++
           errors.push(`用户数据 ${key}`)
@@ -372,7 +424,8 @@ export const getBackupStats = () => {
   const stats = {
     settings: Object.keys(backupData.settings).length,
     favorites: backupData.userData.favorites?.length || 0,
-    watchHistory: backupData.userData.watchHistory?.length || 0,
+    watchHistory: backupData.userData.histories?.length || 0, // 使用历史页面数据
+    parsers: backupData.settings.parsers?.length || 0, // 解析器数量
     sites: Object.keys(backupData.siteData.siteStore || {}).length,
     totalSize: JSON.stringify(backupData).length
   }

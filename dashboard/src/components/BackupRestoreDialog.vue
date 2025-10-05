@@ -2,7 +2,7 @@
   <a-modal
     v-model:visible="visible"
     title="数据备份还原"
-    width="600px"
+    width="520px"
     :footer="false"
     @cancel="handleCancel"
   >
@@ -27,6 +27,10 @@
             <div class="stat-label">观看记录</div>
           </div>
           <div class="stat-item">
+            <div class="stat-value">{{ stats.parsers }}</div>
+            <div class="stat-label">解析器</div>
+          </div>
+          <div class="stat-item">
             <div class="stat-value">{{ stats.sites }}</div>
             <div class="stat-label">站点</div>
           </div>
@@ -44,7 +48,7 @@
         </h3>
         <div class="operation-content">
           <p class="operation-desc">
-            将当前所有设置、收藏、历史记录等数据导出为JSON文件
+            将当前所有设置、收藏、历史记录、解析器等数据导出为JSON文件
           </p>
           <a-button
             type="primary"
@@ -68,7 +72,7 @@
         </h3>
         <div class="operation-content">
           <p class="operation-desc">
-            选择之前导出的备份文件来还原数据
+            选择之前导出的备份文件来还原设置、收藏、历史记录、解析器等数据
           </p>
           <div class="restore-actions">
             <a-upload
@@ -188,6 +192,7 @@ const stats = ref({
   favorites: 0,
   watchHistory: 0,
   sites: 0,
+  parsers: 0,
   totalSize: 0
 })
 
@@ -308,7 +313,7 @@ const handleRemoveFile = (file) => {
   selectedFile.value = null
   fileList.value = []
   
-  // 重置 Upload 组件
+  // 清空 Upload 组件的文件列表
   if (uploadRef.value) {
     uploadRef.value.clearFiles()
   }
@@ -383,7 +388,7 @@ onMounted(() => {
 
 <style scoped>
 .backup-restore-container {
-  padding: 8px 0;
+  padding: 4px 0; /* 进一步减少容器内边距 */
 }
 
 .section-title {
@@ -392,118 +397,124 @@ onMounted(() => {
   font-size: 16px;
   font-weight: 600;
   color: var(--color-text-1);
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .title-icon {
-  margin-right: 8px;
+  margin-right: 6px;
   color: var(--color-primary);
 }
 
 .stats-section {
-  margin-bottom: 32px;
+  margin-bottom: 16px;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .stat-item {
   text-align: center;
-  padding: 16px;
+  padding: 8px 4px;
   background: var(--color-bg-2);
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid var(--color-border-2);
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--color-primary);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  line-height: 1.2;
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-3);
+  line-height: 1.2;
 }
 
 .data-size {
   text-align: center;
-  font-size: 14px;
+  font-size: 12px;
   color: var(--color-text-2);
-  padding: 8px;
+  padding: 6px;
   background: var(--color-bg-1);
-  border-radius: 6px;
+  border-radius: 4px;
+  line-height: 1.2;
 }
 
 .operation-section {
-  margin-bottom: 32px;
+  margin-bottom: 16px;
 }
 
 .operation-content {
   background: var(--color-bg-1);
-  padding: 20px;
-  border-radius: 12px;
+  padding: 12px;
+  border-radius: 8px;
   border: 1px solid var(--color-border-2);
 }
 
 .operation-desc {
-  margin-bottom: 16px;
+  margin-bottom: 10px;
   color: var(--color-text-2);
-  line-height: 1.5;
+  line-height: 1.3;
+  font-size: 13px;
 }
 
 .restore-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 10px;
   align-items: flex-start;
 }
 
 .selected-file {
   display: flex;
   align-items: center;
-  padding: 12px;
+  padding: 8px;
   background: var(--color-bg-2);
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid var(--color-border-2);
 }
 
 .file-icon {
-  margin-right: 8px;
+  margin-right: 6px;
   color: var(--color-primary);
 }
 
 .file-name {
   flex: 1;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--color-text-1);
   word-break: break-all;
+  line-height: 1.3;
 }
 
 .warning-section {
-  margin-top: 24px;
+  margin-top: 12px;
 }
 
 .warning-list {
-  margin: 8px 0 0 0;
-  padding-left: 20px;
+  margin: 4px 0 0 0;
+  padding-left: 16px;
 }
 
 .warning-list li {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   color: var(--color-text-2);
-  font-size: 14px;
+  font-size: 12px;
+  line-height: 1.3;
 }
 
 /* 自定义文件列表样式 */
 .custom-file-list {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 /* 强制隐藏 Upload 组件内部的文件列表 */
@@ -519,37 +530,38 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: var(--color-fill-2);
-  border-radius: 6px;
-  margin-top: 8px;
-  min-height: 48px;
+  border-radius: 4px;
+  margin-top: 6px;
+  min-height: 36px;
 }
 
 .file-info {
   display: flex;
   align-items: center;
   flex: 1;
-  min-height: 24px;
+  min-height: 20px;
 }
 
 .file-icon {
-  margin-right: 8px;
+  margin-right: 6px;
   color: var(--color-text-3);
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .file-name {
   color: var(--color-text-1);
   font-weight: 500;
-  margin-right: 8px;
-  line-height: 1.4;
+  margin-right: 6px;
+  line-height: 1.3;
+  font-size: 13px;
 }
 
 .file-size {
   color: var(--color-text-3);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 11px;
+  line-height: 1.3;
 }
 
 .remove-btn {
@@ -557,8 +569,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
-  min-height: 24px;
+  min-width: 20px;
+  min-height: 20px;
 }
 
 .remove-btn:hover {
@@ -568,13 +580,13 @@ onMounted(() => {
 /* 响应式设计 */
 @media (max-width: 768px) {
   .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (max-width: 480px) {
   .stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

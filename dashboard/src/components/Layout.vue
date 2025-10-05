@@ -14,7 +14,7 @@
         @collapse="onSiderCollapse"
       >
         <div class="logo">
-          <a-popover title="提示">
+          <a-popover title="道长: 您好!">
           <a-image
               width="100%"
               :src="logoSrc"
@@ -112,7 +112,7 @@ export default defineComponent({
       {id: 9, name: '设置', icon: 'icon-shezhi', route: '/settings'}
     ]);
     const logoSrc = ref(logo);
-    const logoDesc = ref('the logo for this application');
+    const logoDesc = ref('欢迎使用DrPlayer');
 
     // 监听路由变化，更新翻页统计store的当前路由
     watch(() => route.path, (newPath) => {
