@@ -14,7 +14,17 @@
         >
           <div class="video_list_item" @click="handleVideoClick(video)">
             <div class="video_list_item_img">
+              <!-- 文件夹图标 -->
+              <div v-if="video.vod_tag && video.vod_tag.includes('folder')" class="folder-icon-container">
+                <i class="iconfont icon-wenjianjia folder-icon"></i>
+              </div>
+              <!-- 文件类型图标 (目录模式下的非文件夹项目) -->
+              <div v-else-if="video.vod_tag && !video.vod_tag.includes('folder')" class="file-icon-container">
+                <i class="iconfont file-type-icon" :class="getFileTypeIcon(video.vod_name)"></i>
+              </div>
+              <!-- 普通视频图片 -->
               <a-image
+                v-else
                 :preview="false"
                 class="video_list_item_img_cover"
                 fit="cover"
@@ -72,6 +82,7 @@ import { useVisitedStore } from '@/stores/visitedStore';
 import ActionRenderer from '@/components/actions/ActionRenderer.vue';
 import videoService from '@/api/services/video';
 import { showToast } from '@/stores/toast.js'
+import { getFileTypeIcon } from '@/utils/fileTypeUtils'
 
 const props = defineProps({
   videos: {
@@ -437,6 +448,8 @@ const handleSpecialAction = (actionType, actionData) => {
   currentActionData.value = null;
 };
 
+
+
 // 暴露方法给父组件
 defineExpose({
   checkTextOverflow,
@@ -497,6 +510,50 @@ defineExpose({
   background: #f5f5f5;
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
+}
+
+.folder-icon-container {
+  width: 100%;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.folder-icon {
+  font-size: 60px;
+  color: #ffa940;
+  transition: all 0.3s ease;
+}
+
+.video_list_item:hover .folder-icon {
+  color: #ff7a00;
+  transform: scale(1.1);
+}
+
+.file-icon-container {
+  width: 100%;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.file-type-icon {
+  font-size: 60px;
+  color: #6c757d;
+  transition: all 0.3s ease;
+}
+
+.video_list_item:hover .file-type-icon {
+  color: #495057;
+  transform: scale(1.1);
 }
 
 .video_list_item_img_cover {

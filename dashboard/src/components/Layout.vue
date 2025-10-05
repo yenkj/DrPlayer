@@ -84,7 +84,7 @@ import { Icon } from '@arco-design/web-vue';
 import { usePaginationStore } from '@/stores/paginationStore';
 import logo from '@/assets/logo.png';
 
-const IconFont = Icon.addFromIconFontCn({src: '//at.alicdn.com/t/c/font_5032989_t69caiom2lh.js'});
+const IconFont = Icon.addFromIconFontCn({src: '//at.alicdn.com/t/c/font_5032989_8fdfro7017b.js'});
 
 export default defineComponent({
   components: {

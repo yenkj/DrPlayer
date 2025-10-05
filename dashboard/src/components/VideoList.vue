@@ -683,10 +683,27 @@ const handleFolderNavigateFromGrid = async (video) => {
   console.log('🗂️ [DEBUG] VideoList收到folder导航请求:', video);
   
   try {
+    // 获取当前面包屑，如果已经在目录模式下，则在现有面包屑基础上添加新层级
+    const currentBreadcrumbs = props.folderNavigationState.isActive 
+      ? props.folderNavigationState.breadcrumbs 
+      : [];
+    
+    // 检查是否已经存在相同的目录，避免重复添加
+    const existingIndex = currentBreadcrumbs.findIndex(b => b.vod_id === video.vod_id);
+    let newBreadcrumbs;
+    
+    if (existingIndex >= 0) {
+      // 如果目录已存在，截取到该目录位置
+      newBreadcrumbs = currentBreadcrumbs.slice(0, existingIndex + 1);
+    } else {
+      // 添加新目录到面包屑末尾
+      newBreadcrumbs = [...currentBreadcrumbs, { vod_id: video.vod_id, vod_name: video.vod_name }];
+    }
+    
     // 设置加载状态
     const loadingState = {
       isActive: true,
-      breadcrumbs: [{ vod_id: video.vod_id, vod_name: video.vod_name }],
+      breadcrumbs: newBreadcrumbs,
       currentData: [],
       currentBreadcrumb: { vod_id: video.vod_id, vod_name: video.vod_name },
       loading: true
@@ -733,7 +750,7 @@ const handleFolderNavigateFromGrid = async (video) => {
       // 更新folder导航状态
       const updatedState = {
         isActive: true,
-        breadcrumbs: [{ vod_id: video.vod_id, vod_name: video.vod_name }],
+        breadcrumbs: newBreadcrumbs,
         currentData: folderData,
         currentBreadcrumb: { vod_id: video.vod_id, vod_name: video.vod_name },
         loading: false
@@ -753,7 +770,7 @@ const handleFolderNavigateFromGrid = async (video) => {
       // 返回空数据状态
       const emptyState = {
         isActive: true,
-        breadcrumbs: [{ vod_id: video.vod_id, vod_name: video.vod_name }],
+        breadcrumbs: newBreadcrumbs,
         currentData: [],
         currentBreadcrumb: { vod_id: video.vod_id, vod_name: video.vod_name },
         loading: false
@@ -775,7 +792,7 @@ const handleFolderNavigateFromGrid = async (video) => {
     // 返回错误状态
     const errorState = {
       isActive: true,
-      breadcrumbs: [{ vod_id: video.vod_id, vod_name: video.vod_name }],
+      breadcrumbs: newBreadcrumbs,
       currentData: [],
       currentBreadcrumb: { vod_id: video.vod_id, vod_name: video.vod_name },
       loading: false
