@@ -296,10 +296,12 @@ const showDebugButton = computed(() => {
 
 // 计算属性：代理后的视频链接
 const proxyVideoUrl = computed(() => {
-  if (!props.videoUrl) return ''
+  // 使用当前实际播放的URL，如果没有则使用props.videoUrl
+  const actualUrl = currentPlayingUrl.value || props.videoUrl
+  if (!actualUrl) return ''
   
   const headers = props.headers || {}
-  return processVideoUrl(props.videoUrl, headers)
+  return processVideoUrl(actualUrl, headers)
 })
 
 // 检查是否有下一集
