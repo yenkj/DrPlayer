@@ -812,6 +812,11 @@
       :current-player="settings.playerType"
       @confirm="handlePlayerSelect"
     />
+    
+    <!-- 备份还原对话框 -->
+    <BackupRestoreDialog
+      v-model:visible="backupRestoreVisible"
+    />
   </div>
 </template>
 
@@ -853,6 +858,7 @@ import {
 } from '@arco-design/web-vue/es/icon'
 import AddressHistory from '@/components/AddressHistory.vue'
 import PlayerSelector from '@/components/PlayerSelector.vue'
+import BackupRestoreDialog from '@/components/BackupRestoreDialog.vue'
 import configService from '@/api/services/config'
 import siteService from '@/api/services/site'
 import { 
@@ -932,6 +938,9 @@ const settings = reactive({
 
 // 播放器选择对话框状态
 const playerSelectVisible = ref(false)
+
+// 备份还原对话框状态
+const backupRestoreVisible = ref(false)
 
 // 保存地址配置
 const saveAddress = async (configType) => {
@@ -1434,6 +1443,9 @@ const handleSettingClick = (settingKey) => {
       break
     case 'referrer-policy':
       handleReferrerPolicySelect()
+      break
+    case 'backup':
+      backupRestoreVisible.value = true
       break
     case 'reset':
       resetAllSettings()
