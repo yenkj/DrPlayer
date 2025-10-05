@@ -784,7 +784,7 @@
               </div>
             </div>
             <div class="setting-value">
-              <span class="value-text">已关闭</span>
+              <span class="value-text">{{ settings.searchAggregation ? '已开启' : '已关闭' }}</span>
               <icon-right class="arrow-icon" />
             </div>
           </div>
@@ -934,7 +934,8 @@ const settings = reactive({
   autoLive: false,
   secureDns: false,
   cspBypass: true, // CSP绕过开关
-  referrerPolicy: 'no-referrer' // 默认referrer策略
+  referrerPolicy: 'no-referrer', // 默认referrer策略
+  searchAggregation: false // 聚搜功能开关，默认关闭
 })
 
 // 播放器选择对话框状态
@@ -1346,6 +1347,17 @@ const handleCSPBypassToggle = () => {
   }
 }
 
+// 处理聚搜功能开关
+const handleSearchAggregationToggle = () => {
+  settings.searchAggregation = !settings.searchAggregation
+  
+  if (settings.searchAggregation) {
+    Message.success('已开启聚搜功能')
+  } else {
+    Message.info('已关闭聚搜功能')
+  }
+}
+
 // 处理Referrer策略选择
 const handleReferrerPolicySelect = () => {
   // 使用导入的策略列表
@@ -1404,6 +1416,9 @@ const handleSettingClick = (settingKey) => {
       break
     case 'referrer-policy':
       handleReferrerPolicySelect()
+      break
+    case 'search-aggregation':
+      handleSearchAggregationToggle()
       break
     case 'backup':
       backupRestoreVisible.value = true
