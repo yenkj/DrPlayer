@@ -359,7 +359,7 @@ onMounted(() => {
   // 监听筛选组件的高度变化
   const observeFilterChanges = () => {
     const categoryNav = document.querySelector('.category-nav-container');
-    if (categoryNav) {
+    if (categoryNav && containerRef.value) {
       const observer = new MutationObserver(() => {
         // 延迟执行以确保DOM更新完成
         setTimeout(() => {

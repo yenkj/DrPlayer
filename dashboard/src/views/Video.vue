@@ -17,6 +17,14 @@
 
   <!-- 内容区域 -->
   <div class="main-container">
+    <!-- 全局loading指示器 -->
+    <div v-if="globalLoading" class="global-loading-overlay">
+      <div class="global-loading-content">
+        <a-spin size="large" />
+        <div class="loading-text">正在切换数据源...</div>
+      </div>
+    </div>
+    
     <a-layout-content class="content">
       <!-- 搜索结果展示 -->
       <SearchResults 
@@ -160,6 +168,9 @@ const folderNavigationState = reactive({
   loading: false
 });
 
+// 全局loading状态（用于换源等操作）
+const globalLoading = ref(false);
+
 // 保存进入folder模式前的状态
 const previousState = reactive({
   activeKey: null,
@@ -277,6 +288,22 @@ const handleConfirmChange = (site) => {
   setCurrentSite(site);
   form.now_site_title = site.name;
   form.visible = false;
+  
+  // 1. 如果当前在目录模式，自动退出目录模式
+  if (folderNavigationState.isActive) {
+    console.log('🔄 [换源] 检测到目录模式，自动退出目录模式');
+    folderNavigationState.isActive = false;
+    folderNavigationState.breadcrumbs = [];
+    folderNavigationState.currentData = [];
+    folderNavigationState.currentBreadcrumb = null;
+    folderNavigationState.loading = false;
+    
+    // 清空保存的状态
+    previousState.activeKey = null;
+    previousState.scrollPosition = 0;
+    previousState.savedAt = null;
+  }
+  
   getClassList(site); //获取分类列表
 };
 //获取分类列表
@@ -287,6 +314,9 @@ const getClassList = async (site) => {
   }
 
   console.log(site, "确认换源");
+  
+  // 2. 显示loading状态
+  globalLoading.value = true;
 
   // 先清除之前的数据，防止数据残留
   form.classList = {
@@ -320,6 +350,9 @@ const getClassList = async (site) => {
       filters: {}
     };
     form.recommendVideos = [];
+  } finally {
+    // 3. 隐藏loading状态
+    globalLoading.value = false;
   }
 };
 const onSearch = async (value) => {
@@ -942,5 +975,39 @@ onBeforeUnmount(() => {
 
 .current-time span {
   font-weight: 500;
+}
+
+/* 全局loading样式 */
+.global-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(2px);
+}
+
+.global-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px;
+  background: var(--color-bg-1);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--color-border-2);
+}
+
+.loading-text {
+  font-size: 16px;
+  color: var(--color-text-1);
+  font-weight: 500;
+  text-align: center;
 }
 </style>
