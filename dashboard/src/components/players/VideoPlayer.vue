@@ -668,10 +668,9 @@ const closePlayer = () => {
     videoPlayer.value.currentTime = 0
   }
   
-  // 清理HLS实例
-  if (hlsInstance.value) {
-    hlsInstance.value.destroy()
-    hlsInstance.value = null
+  // 清理播放器实例
+  if (mediaPlayerManager.value) {
+    mediaPlayerManager.value.destroy()
   }
   
   // 清理片尾跳过定时器
