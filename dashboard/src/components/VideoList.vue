@@ -121,6 +121,7 @@ import { ref, reactive, onMounted, watch, computed, nextTick } from "vue";
 import { usePaginationStore } from '@/stores/paginationStore';
 import { getCategoryData } from '@/api/modules/module';
 import { processExtendParam } from '@/utils/apiUtils';
+import { encodeFilters } from '@/api/utils';
 import CategoryNavigation from './CategoryNavigation.vue';
 import FilterSection from './FilterSection.vue';
 import VideoGrid from './VideoGrid.vue';
@@ -248,13 +249,25 @@ const toggleFilter = (filterKey, filterValue, filterName) => {
     selectedFilters[activeKey.value][filterKey] = filterValue;
   }
   
-  // 重新获取数据
-  refreshCategoryData(activeKey.value);
+  // 如果在目录模式下，重新获取目录数据
+  if (props.folderNavigationState.isActive && props.folderNavigationState.currentBreadcrumb) {
+    handleFolderNavigate(props.folderNavigationState.currentBreadcrumb);
+  } else {
+    // 重新获取分类数据
+    refreshCategoryData(activeKey.value);
+  }
 };
 
 const resetFilters = (categoryId) => {
   delete selectedFilters[categoryId];
-  refreshCategoryData(categoryId);
+  
+  // 如果在目录模式下，重新获取目录数据
+  if (props.folderNavigationState.isActive && props.folderNavigationState.currentBreadcrumb) {
+    handleFolderNavigate(props.folderNavigationState.currentBreadcrumb);
+  } else {
+    // 重新获取分类数据
+    refreshCategoryData(categoryId);
+  }
 };
 
 const refreshCategoryData = (categoryId) => {
@@ -682,13 +695,26 @@ const handleFolderNavigateFromGrid = async (video) => {
     emit('folder-navigate', loadingState);
     console.log('props.extend:',props.extend)
     console.log('processExtendParam(props.extend):',processExtendParam(props.extend))
-    // 调用T4分类接口
-    const response = await getCategoryData(props.module, {
+    
+    // 获取当前分类的筛选条件
+    const filters = selectedFilters[activeKey.value] || {};
+    console.log('🗂️ [DEBUG] 目录模式应用筛选条件:', filters);
+    
+    // 调用T4分类接口，包含筛选条件
+    const requestParams = {
       t: video.vod_id, // 使用vod_id作为type_id
       pg: 1,
       extend: processExtendParam(props.extend),
       apiUrl: props.apiUrl
-    });
+    };
+    
+    // 如果有筛选条件，添加ext参数
+    if (Object.keys(filters).length > 0) {
+      // requestParams.ext = encodeFilters(filters);
+      console.log('🗂️ [DEBUG] 目录模式编码后的筛选条件:', requestParams.ext);
+    }
+    
+    const response = await getCategoryData(props.module, requestParams);
     
     console.log('🗂️ [DEBUG] T4分类接口响应:', response);
     
@@ -785,13 +811,25 @@ const handleFolderNavigate = async (breadcrumb) => {
     
     emit('folder-navigate', loadingState);
     
-    // 调用T4分类接口
-    const response = await getCategoryData(props.module, {
+    // 获取当前分类的筛选条件
+    const filters = selectedFilters[activeKey.value] || {};
+    console.log('🗂️ [DEBUG] 面包屑导航应用筛选条件:', filters);
+    
+    // 调用T4分类接口，包含筛选条件
+    const requestParams = {
       t: breadcrumb.vod_id,
       pg: 1,
       extend: processExtendParam(props.extend),
       apiUrl: props.apiUrl
-    });
+    };
+    
+    // 如果有筛选条件，添加ext参数
+    if (Object.keys(filters).length > 0) {
+      // requestParams.ext = encodeFilters(filters);
+      console.log('🗂️ [DEBUG] 面包屑导航编码后的筛选条件:', requestParams.ext);
+    }
+    
+    const response = await getCategoryData(props.module, requestParams);
     
     if (response && response.list && response.list.length > 0) {
       const folderData = response.list;
