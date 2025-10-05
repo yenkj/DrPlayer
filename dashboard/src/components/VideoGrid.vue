@@ -4,7 +4,7 @@
       @scroll="handleScroll"
       class="video-scroll-container"
       ref="scrollbarRef"
-      :style="'height:' + scrollAreaHeight + 'px; overflow: auto;'"
+      :style="{ height: containerHeightRef + 'px', overflow: 'auto' }"
     >
       <a-grid :cols="{ xs: 2, sm: 3, md: 4, lg: 5, xl: 6, xxl: 8 }" :rowGap="16" :colGap="12">
         <a-grid-item
@@ -139,7 +139,9 @@ const router = useRouter();
 const visitedStore = useVisitedStore();
 const containerRef = ref(null);
 const scrollbarRef = ref(null);
-const scrollAreaHeight = ref(0);
+// 使用非响应式变量避免递归更新
+let containerHeight = 0;
+const containerHeightRef = ref(0);
 
 // ActionRenderer相关
 const actionRendererRef = ref(null);
@@ -331,8 +333,9 @@ const updateScrollAreaHeight = () => {
         const newHeight = Math.max(containerHeight - footerHeight - heightReduction, 250); // 降低最小高度
         
         // 只有当高度真正发生变化时才更新
-        if (Math.abs(scrollAreaHeight.value - newHeight) > 5) {
-          scrollAreaHeight.value = newHeight;
+        if (Math.abs(containerHeight - newHeight) > 5) {
+          containerHeight = newHeight;
+          containerHeightRef.value = newHeight;
         }
         
         console.log(`视频数量: ${videoCount}, 估算行数: ${estimatedRows}, 列数: ${gridCols}, 容器宽度: ${containerWidth}px, 最终高度: ${newHeight}px`);
@@ -452,29 +455,44 @@ onBeforeUnmount(() => {
 let updateTimer = null;
 let lastVideosLength = 0;
 let lastShowStats = false;
+let lastVideosHash = '';
+
+// 计算videos数组的简单hash
+const getVideosHash = (videos) => {
+  if (!videos || videos.length === 0) return '';
+  return videos.map(v => v.vod_id || '').join(',');
+};
 
 watch([() => props.videos, () => props.showStats], ([newVideos, newShowStats]) => {
-  // 避免不必要的更新
-  if (newVideos.length === lastVideosLength && newShowStats === lastShowStats) {
+  const newVideosHash = getVideosHash(newVideos);
+  
+  // 更严格的条件检查，避免不必要的更新
+  if (newVideos.length === lastVideosLength && 
+      newShowStats === lastShowStats && 
+      newVideosHash === lastVideosHash) {
     return;
   }
   
   lastVideosLength = newVideos.length;
   lastShowStats = newShowStats;
+  lastVideosHash = newVideosHash;
   
   // 清除之前的定时器
   if (updateTimer) {
     clearTimeout(updateTimer);
   }
   
-  // 使用防抖避免频繁更新
+  // 使用防抖避免频繁更新，增加延迟
   updateTimer = setTimeout(() => {
-    nextTick(() => {
-      checkTextOverflow();
-      updateScrollAreaHeight();
-    });
-  }, 100);
-}, { deep: true });
+    // 再次检查是否需要更新，避免组件已卸载时的更新
+    if (containerRef.value && !isUpdatingHeight && !isCheckingOverflow) {
+      nextTick(() => {
+        checkTextOverflow();
+        updateScrollAreaHeight();
+      });
+    }
+  }, 200); // 增加延迟到200ms
+}, { deep: false }); // 移除deep监听，减少触发频率
 
 // 滚动位置恢复方法
 const restoreScrollPosition = (scrollPosition) => {

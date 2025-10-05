@@ -36,7 +36,7 @@
 
         <!-- 加载状态 -->
         <div v-else-if="loading && videos.length === 0" class="loading-container">
-          <a-spin size="large" />
+          <a-spin :size="32" />
           <p class="loading-text">正在搜索...</p>
         </div>
 
