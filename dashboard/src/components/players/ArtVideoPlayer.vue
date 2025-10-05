@@ -8,12 +8,15 @@
       :countdown-enabled="countdownEnabled"
       :skip-enabled="skipEnabled"
       :show-debug-button="showDebugButton"
+      :qualities="convertQualitiesToHeaderFormat"
+      :current-quality="getCurrentQualityLabel"
       @toggle-auto-next="toggleAutoNext"
       @toggle-countdown="toggleCountdown"
       @player-change="handlePlayerTypeChange"
       @open-skip-settings="openSkipSettingsDialog"
       @toggle-debug="toggleDebugDialog"
       @proxy-change="handleProxyChange"
+      @quality-change="handleHeaderQualityChange"
       @close="closePlayer"
     />
     <div class="art-player-wrapper" v-show="props.visible">
@@ -57,7 +60,7 @@
     <!-- 调试信息弹窗组件 -->
     <DebugInfoDialog
       :visible="showDebugDialog"
-      :video-url="videoUrl"
+      :video-url="currentPlayingUrl || videoUrl"
       :headers="headers"
       :player-type="'artplayer'"
       :detected-format="detectedFormat"
@@ -124,11 +127,24 @@ const props = defineProps({
   headers: {
     type: Object,
     default: () => ({})
+  },
+  // 画质相关属性
+  qualities: {
+    type: Array,
+    default: () => []
+  },
+  hasMultipleQualities: {
+    type: Boolean,
+    default: false
+  },
+  initialQuality: {
+    type: String,
+    default: '默认'
   }
 })
 
 // Emits
-const emit = defineEmits(['close', 'error', 'player-change', 'next-episode', 'episode-selected'])
+const emit = defineEmits(['close', 'error', 'player-change', 'next-episode', 'episode-selected', 'quality-change'])
 
 // 响应式数据
 const artPlayerContainer = ref(null)
@@ -150,6 +166,11 @@ const countdownEnabled = ref(false) // 倒计时开关，默认关闭
 const showDebugDialog = ref(false)
 const detectedFormat = ref('')
 
+// 画质相关
+const currentQuality = ref('默认')
+const availableQualities = ref([])
+const currentPlayingUrl = ref('')
+
 // 计算属性：是否显示调试按钮
 const showDebugButton = computed(() => {
   return !!props.videoUrl
@@ -161,6 +182,26 @@ const proxyVideoUrl = computed(() => {
   
   const headers = props.headers || {}
   return processVideoUrl(props.videoUrl, headers)
+})
+
+// 计算属性：获取当前画质的标签
+const getCurrentQualityLabel = computed(() => {
+  if (!currentQuality.value || availableQualities.value.length === 0) {
+    return '默认'
+  }
+  
+  // 按照T4格式处理：使用name字段
+  const currentQualityData = availableQualities.value.find(q => q.name === currentQuality.value)
+  return currentQualityData?.name || currentQuality.value || '默认'
+})
+
+// 计算属性：转换画质数据格式以适配PlayerHeader组件
+const convertQualitiesToHeaderFormat = computed(() => {
+  return availableQualities.value.map(q => ({
+    name: q.name || '未知',
+    value: q.name,
+    url: q.url
+  }))
 })
 
 // 选集弹窗相关数据已移除，现在使用ArtPlayer的layer功能
@@ -430,6 +471,21 @@ const initArtPlayer = async (url) => {
         },
         {
           position: 'right',
+          html: availableQualities.value.length > 1 ? `画质: ${getCurrentQualityLabel.value}` : '',
+          tooltip: availableQualities.value.length > 1 ? '选择画质' : '',
+          style: availableQualities.value.length > 1 ? {} : { display: 'none' },
+          selector: availableQualities.value.length > 1 ? availableQualities.value.map(q => ({
+            html: q.name || '未知',
+            value: q.name,
+            default: q.name === currentQuality.value
+          })) : [],
+          onSelect: function (item) {
+            handleQualityChange(item.value)
+            return item.html
+          },
+        },
+        {
+          position: 'right',
           html: props.episodes.length > 1 ? '选集' : '',
           tooltip: props.episodes.length > 1 ? '选择集数' : '',
           style: props.episodes.length > 1 ? {} : { display: 'none' },
@@ -594,6 +650,109 @@ const initArtPlayer = async (url) => {
     Message.error('播放器初始化失败')
     emit('error', '播放器初始化失败')
   }
+}
+
+// 初始化画质数据
+const initQualityData = () => {
+  if (props.qualities && props.qualities.length > 0) {
+    availableQualities.value = [...props.qualities]
+    currentQuality.value = props.initialQuality || props.qualities[0]?.name || '默认'
+    
+    // 设置当前播放URL
+    const currentQualityData = availableQualities.value.find(q => q.name === currentQuality.value)
+    currentPlayingUrl.value = currentQualityData?.url || props.videoUrl
+  } else {
+    availableQualities.value = []
+    currentQuality.value = '默认'
+    currentPlayingUrl.value = props.videoUrl
+  }
+  
+  console.log('画质数据初始化完成:', {
+    available: availableQualities.value,
+    current: currentQuality.value,
+    currentPlayingUrl: currentPlayingUrl.value
+  })
+}
+
+// 处理画质切换
+const handleQualityChange = (qualityName) => {
+  const quality = availableQualities.value.find(q => q.name === qualityName)
+  if (!quality) {
+    console.warn('未找到指定画质:', qualityName)
+    return
+  }
+  
+  console.log('切换画质:', qualityName, quality)
+  
+  // 保存当前播放状态
+  let currentTime = 0
+  let isPaused = true
+  
+  if (artPlayerInstance.value) {
+    currentTime = artPlayerInstance.value.currentTime || 0
+    isPaused = artPlayerInstance.value.paused
+  }
+  
+  // 更新当前画质和播放URL
+  currentQuality.value = qualityName
+  currentPlayingUrl.value = quality.url
+  
+  // 触发画质切换事件，让父组件更新videoUrl
+  emit('quality-change', quality)
+  
+  // 等待父组件更新videoUrl后重新初始化播放器
+  nextTick(() => {
+    if (quality.url && artPlayerInstance.value) {
+      // 更新播放器URL
+      artPlayerInstance.value.switchUrl(quality.url)
+      
+      // 恢复播放位置和状态
+      setTimeout(() => {
+        if (artPlayerInstance.value) {
+          artPlayerInstance.value.currentTime = currentTime
+          if (!isPaused) {
+            artPlayerInstance.value.play()
+          }
+        }
+      }, 100)
+    }
+  })
+}
+
+
+
+// 处理来自PlayerHeader的画质切换事件
+const handleHeaderQualityChange = (qualityName) => {
+  // 根据name找到对应的画质
+  const quality = availableQualities.value.find(q => q.name === qualityName)
+  
+  if (quality) {
+    handleQualityChange(quality.name)
+  }
+}
+
+// 切换视频源（用于画质切换）
+const switchVideoSource = (newUrl) => {
+  if (!artPlayerInstance.value || !newUrl) return
+  
+  console.log('切换视频源:', newUrl)
+  
+  // 保存当前播放状态
+  const currentTime = artPlayerInstance.value.currentTime || 0
+  const isPaused = artPlayerInstance.value.paused
+  
+  // 切换URL
+  artPlayerInstance.value.switchUrl(newUrl)
+  
+  // 恢复播放位置和状态
+  setTimeout(() => {
+    if (artPlayerInstance.value) {
+      artPlayerInstance.value.currentTime = currentTime
+      if (!isPaused) {
+        artPlayerInstance.value.play()
+      }
+    }
+  }, 100)
 }
 
 // 关闭播放器
@@ -1066,6 +1225,18 @@ watch(() => props.visible, async (newVisible) => {
   }
 })
 
+// 监听画质数据变化
+watch(() => props.qualities, () => {
+  initQualityData()
+}, { immediate: true, deep: true })
+
+// 监听初始画质变化
+watch(() => props.initialQuality, (newQuality) => {
+  if (newQuality && newQuality !== currentQuality.value) {
+    currentQuality.value = newQuality
+  }
+})
+
 // 窗口大小变化处理
 const handleResize = () => {
   if (artPlayerContainer.value && artPlayerInstance.value) {
@@ -1086,6 +1257,8 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
   // 初始化片头片尾设置
   initSkipSettings()
+  // 初始化画质数据
+  initQualityData()
 })
 
 // 组件卸载时清理资源
