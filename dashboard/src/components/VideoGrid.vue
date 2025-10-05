@@ -14,21 +14,29 @@
         >
           <div class="video_list_item" @click="handleVideoClick(video)">
             <div class="video_list_item_img">
-              <!-- 文件夹图标 -->
-              <div v-if="video.vod_tag && video.vod_tag.includes('folder')" class="folder-icon-container">
+              <!-- 优先显示vod_pic图片，如果有值的话 -->
+              <a-image
+                v-if="video.vod_pic && video.vod_pic.trim() !== ''"
+                :preview="false"
+                class="video_list_item_img_cover"
+                fit="cover"
+                :src="video.vod_pic"
+              />
+              <!-- 文件夹图标 (当vod_pic为空且是文件夹时) -->
+              <div v-else-if="video.vod_tag && video.vod_tag.includes('folder')" class="folder-icon-container">
                 <i class="iconfont icon-wenjianjia folder-icon"></i>
               </div>
-              <!-- 文件类型图标 (目录模式下的非文件夹项目) -->
+              <!-- 文件类型图标 (当vod_pic为空且是目录模式下的非文件夹项目时) -->
               <div v-else-if="video.vod_tag && !video.vod_tag.includes('folder')" class="file-icon-container">
                 <i class="iconfont file-type-icon" :class="getFileTypeIcon(video.vod_name)"></i>
               </div>
-              <!-- 普通视频图片 -->
+              <!-- 默认图片 (当vod_pic为空且没有vod_tag时) -->
               <a-image
                 v-else
                 :preview="false"
                 class="video_list_item_img_cover"
                 fit="cover"
-                :src="video.vod_pic"
+                :src="video.vod_pic || '/default-poster.svg'"
               />
               <!-- vod_remarks 浮层 -->
               <div v-if="video.vod_remarks" class="video_remarks_overlay" v-html="video.vod_remarks">
