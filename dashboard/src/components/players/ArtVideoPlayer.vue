@@ -698,25 +698,8 @@ const handleQualityChange = (qualityName) => {
   currentPlayingUrl.value = quality.url
   
   // 触发画质切换事件，让父组件更新videoUrl
+  // 父组件更新videoUrl后会触发watch监听器重新初始化播放器
   emit('quality-change', quality)
-  
-  // 等待父组件更新videoUrl后重新初始化播放器
-  nextTick(() => {
-    if (quality.url && artPlayerInstance.value) {
-      // 更新播放器URL
-      artPlayerInstance.value.switchUrl(quality.url)
-      
-      // 恢复播放位置和状态
-      setTimeout(() => {
-        if (artPlayerInstance.value) {
-          artPlayerInstance.value.currentTime = currentTime
-          if (!isPaused) {
-            artPlayerInstance.value.play()
-          }
-        }
-      }, 100)
-    }
-  })
 }
 
 
