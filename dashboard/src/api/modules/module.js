@@ -5,6 +5,7 @@
 
 import { get, post } from '../request'
 import { API_PATHS, MODULE_ACTIONS, PAGINATION } from '../config'
+import { processExtendParam } from '@/utils/apiUtils'
 import axios from 'axios'
 
 /**
@@ -44,29 +45,7 @@ const parseHeaders = (headers) => {
   return {}
 }
 
-/**
- * 处理extend参数，确保对象类型转换为JSON字符串
- * @param {string|object} extend - 扩展参数
- * @returns {string|undefined} 处理后的extend参数
- */
-const processExtendParam = (extend) => {
-  if (!extend) {
-    return undefined
-  }
-  
-  // 如果extend是对象类型，转换为JSON字符串
-  if (typeof extend === 'object' && extend !== null) {
-    try {
-      return JSON.stringify(extend)
-    } catch (error) {
-      console.warn('extend参数JSON序列化失败:', error)
-      return undefined
-    }
-  }
-  
-  // 如果已经是字符串，直接返回
-  return extend
-}
+
 
 /**
  * 构建模块接口URL
