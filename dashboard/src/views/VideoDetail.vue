@@ -1114,9 +1114,50 @@ const executeParsingWithSelectedParser = async (parser, data) => {
       console.log('🎬 [真正解析] 调用JSON解析器，传递数据:', data)
       result = await ParserService.parseWithJsonParser(normalizedParser, data)
     } else if (normalizedParser.type === 'sniffer') {
-      // 嗅探类型解析
-      console.log('🎬 [真正解析] 调用嗅探解析器，传递数据:', data)
-      result = await ParserService.parseWithSnifferParser(normalizedParser, data)
+      // 嗅探类型解析 - 使用配置的代理嗅探接口
+      console.log('🎬 [真正解析] 调用代理嗅探接口，传递数据:', data)
+      
+      // 导入嗅探服务
+      const { sniffVideoWithConfig } = await import('@/api/services/sniffer.js')
+      
+      // 提取要嗅探的URL
+      let targetUrl
+      if (data && typeof data === 'object') {
+        targetUrl = data.url || data.play_url || data
+      } else {
+        targetUrl = data
+      }
+      
+      if (!targetUrl || typeof targetUrl !== 'string') {
+        throw new Error('无效的嗅探目标URL')
+      }
+      
+      // 构建完整的解析地址：解析器URL + 被解析URL
+      const fullParseUrl = normalizedParser.url + encodeURIComponent(targetUrl)
+      
+      console.log('🔍 [嗅探解析] 解析器URL:', normalizedParser.url)
+      console.log('🔍 [嗅探解析] 被解析URL:', targetUrl)
+      console.log('🔍 [嗅探解析] 完整解析地址:', fullParseUrl)
+      
+      // 调用代理嗅探接口，传入完整的解析地址
+      const sniffResult = await sniffVideoWithConfig(fullParseUrl)
+      
+      if (sniffResult.success && sniffResult.data && sniffResult.data.length > 0) {
+        // 转换嗅探结果为解析器格式
+        const videoData = sniffResult.data[0] // 取第一个结果
+        result = {
+          success: true,
+          url: videoData.url,
+          headers: {
+            'Referer': fullParseUrl,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          },
+          qualities: [],
+          message: '嗅探解析成功'
+        }
+      } else {
+        throw new Error('嗅探未找到可播放的视频链接')
+      }
     } else {
       throw new Error(`不支持的解析器类型: ${normalizedParser.type}`)
     }

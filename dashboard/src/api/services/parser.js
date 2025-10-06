@@ -139,17 +139,30 @@ class ParserService {
       
       console.log('要解析的视频URL:', videoUrl)
       
-      let requestUrl = parser.url
+      // 构建完整的解析地址：解析器URL + 待解析URL
+      const fullParseUrl = parser.url + encodeURIComponent(videoUrl)
+      console.log('拼接后的解析地址:', fullParseUrl)
       
-      // 直接将解析器URL与待解析URL相加
-      if (parser.url.includes('{url}')) {
-        // 如果包含{url}占位符，替换它（兼容旧格式）
-        requestUrl = parser.url.replace(/\{url\}/g, encodeURIComponent(videoUrl))
-        console.log('使用占位符替换，最终URL:', requestUrl)
+      // 获取代理访问接口配置
+      const savedAddresses = JSON.parse(localStorage.getItem('addressSettings') || '{}')
+      const proxyAccessEnabled = savedAddresses.proxyAccessEnabled || false
+      const proxyAccess = savedAddresses.proxyAccess || ''
+      
+      let requestUrl = fullParseUrl
+      
+      // 如果启用了代理访问接口，使用代理访问链接
+      if (proxyAccessEnabled && proxyAccess) {
+        console.log('🔄 [代理访问] 使用代理访问接口:', proxyAccess)
+        
+        if (proxyAccess.includes('${url}')) {
+          // 替换代理访问链接中的${url}占位符
+          requestUrl = proxyAccess.replace(/\$\{url\}/g, encodeURIComponent(fullParseUrl))
+          console.log('🔄 [代理访问] 替换占位符后的最终URL:', requestUrl)
+        } else {
+          console.warn('⚠️ [代理访问] 代理访问链接中未找到${url}占位符，将直接访问原地址')
+        }
       } else {
-        // 直接字符串相加：解析器URL + 待解析URL
-        requestUrl = parser.url + encodeURIComponent(videoUrl)
-        console.log('直接相加，最终URL:', requestUrl)
+        console.log('🔄 [直接访问] 代理访问接口未启用，直接访问解析地址')
       }
       
       // 发送解析请求
@@ -158,6 +171,7 @@ class ParserService {
         url: requestUrl,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Referer': fullParseUrl, // 使用拼接后的解析地址作为Referer
           ...parser.headers
         },
         timeout: 30000
