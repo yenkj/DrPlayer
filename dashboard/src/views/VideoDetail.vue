@@ -68,6 +68,8 @@
         @player-change="handlePlayerTypeChange"
         @parser-change="handleParserChange"
         @next-episode="handleNextEpisode"
+        @episode-selected="handleEpisodeSelected"
+        @quality-change="handleQualityChange"
       />
 
       <!-- ArtPlayer 播放器组件 -->
@@ -1017,19 +1019,36 @@ const handleNextEpisode = (nextEpisodeIndex) => {
 }
 
 // 处理选集选择事件
-const handleEpisodeSelected = (episode) => {
-  console.log('从播放器选择剧集:', episode)
+const handleEpisodeSelected = (episodeParam) => {
+  console.log('从播放器选择剧集:', episodeParam)
   
-  // 查找选集在当前路线中的索引
-  const episodeIndex = currentRouteEpisodes.value.findIndex(ep => 
-    ep.name === episode.name && ep.url === episode.url
-  )
-  
-  if (episodeIndex !== -1) {
-    selectEpisode(episodeIndex)
+  // 判断传入的参数类型
+  if (typeof episodeParam === 'number') {
+    // 如果是数字，直接作为索引使用（循环播放场景）
+    const episodeIndex = episodeParam
+    if (episodeIndex >= 0 && episodeIndex < currentRouteEpisodes.value.length) {
+      console.log('使用索引选择选集:', episodeIndex)
+      selectEpisode(episodeIndex)
+    } else {
+      console.warn('无效的选集索引:', episodeIndex)
+      Message.warning('选集切换失败：无效的选集索引')
+    }
+  } else if (episodeParam && typeof episodeParam === 'object') {
+    // 如果是对象，按原来的逻辑查找索引
+    const episodeIndex = currentRouteEpisodes.value.findIndex(ep => 
+      ep.name === episodeParam.name && ep.url === episodeParam.url
+    )
+    
+    if (episodeIndex !== -1) {
+      console.log('通过对象查找到选集索引:', episodeIndex)
+      selectEpisode(episodeIndex)
+    } else {
+      console.warn('未找到选集:', episodeParam)
+      Message.warning('选集切换失败：未找到匹配的选集')
+    }
   } else {
-    console.warn('未找到选集:', episode)
-    Message.warning('选集切换失败')
+    console.warn('无效的选集参数:', episodeParam)
+    Message.warning('选集切换失败：参数格式错误')
   }
 }
 
