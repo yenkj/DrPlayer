@@ -318,6 +318,8 @@ const parserStore = useParserStore()
 const loading = ref(false)
 const error = ref('')
 const videoDetail = ref(null)
+// 保存初始的folder状态，用于返回时恢复
+const initialFolderState = ref(null)
 const originalVideoInfo = ref({
   id: '',
   name: '',
@@ -763,6 +765,17 @@ const goBack = () => {
             console.log('设置返回分类:', query.activeKey);
           }
           
+          // 检查是否有目录状态需要恢复（使用保存的初始状态）
+          if (initialFolderState.value) {
+            try {
+              const folderState = JSON.parse(initialFolderState.value);
+              // 将保存的folderState添加到query参数中
+              query.folderState = initialFolderState.value;
+            } catch (error) {
+              console.error('解析保存的目录状态失败:', error);
+            }
+          }
+          
           // 检查是否有保存的Video页面状态
           const savedVideoState = pageStateStore.getPageState('video');
           if (savedVideoState && !pageStateStore.isStateExpired('video')) {
@@ -780,11 +793,38 @@ const goBack = () => {
       }
       
       // 跳转到来源页面
-      router.push({
+      console.log('🔄 [DEBUG] ========== VideoDetail goBack 即将跳转 ==========');
+      console.log('🔄 [DEBUG] sourceRouteName:', sourceRouteName);
+      console.log('🔄 [DEBUG] params:', JSON.stringify(params, null, 2));
+      console.log('🔄 [DEBUG] query参数完整内容:', JSON.stringify(query, null, 2));
+      console.log('🔄 [DEBUG] folderState参数值:', query.folderState);
+        console.log('🔄 [DEBUG] folderState参数类型:', typeof query.folderState);
+        console.log('🔄 [DEBUG] initialFolderState.value:', initialFolderState.value);
+        console.log('🔄 [DEBUG] _returnToActiveKey参数值:', query._returnToActiveKey);
+        
+        if (query.folderState) {
+          try {
+            const parsedFolderState = JSON.parse(query.folderState);
+            console.log('🔄 [DEBUG] 解析后的folderState:', JSON.stringify(parsedFolderState, null, 2));
+            console.log('🔄 [DEBUG] folderState.isActive:', parsedFolderState.isActive);
+            console.log('🔄 [DEBUG] folderState.breadcrumbs:', parsedFolderState.breadcrumbs);
+            console.log('🔄 [DEBUG] folderState.currentBreadcrumb:', parsedFolderState.currentBreadcrumb);
+          } catch (e) {
+            console.error('🔄 [ERROR] folderState解析失败:', e);
+          }
+        } else {
+          console.log('🔄 [DEBUG] 没有folderState参数传递');
+        }
+      
+      const routerPushParams = {
         name: sourceRouteName,
         params: params,
         query: query
-      })
+      };
+      console.log('🔄 [DEBUG] router.push完整参数:', JSON.stringify(routerPushParams, null, 2));
+      
+      router.push(routerPushParams);
+      console.log('🔄 [DEBUG] ========== VideoDetail goBack 跳转完成 ==========');
     } catch (error) {
       console.error('解析来源页面信息失败:', error)
       // 如果解析失败，使用默认的返回方式
@@ -1736,8 +1776,19 @@ watch(() => [route.params.id, route.query], () => {
     console.log('检测到路由变化，重新加载视频详情:', {
       id: route.params.id,
       fromCollection: route.query.fromCollection,
-      name: route.query.name
+      name: route.query.name,
+      folderState: route.query.folderState
     })
+    
+    // 保存初始的folderState（仅在首次加载时保存）
+    if (route.query.folderState && !initialFolderState.value) {
+      try {
+        initialFolderState.value = route.query.folderState;
+      } catch (error) {
+        console.error('VideoDetail保存folderState失败:', error);
+      }
+    }
+    
     loadVideoDetail()
   }
 }, { immediate: true, deep: true })
