@@ -1311,7 +1311,7 @@ const handleProxyPlayEnabledChange = (enabled) => {
 
 // 下载代理播放器
 const downloadProxyPlayer = () => {
-  const url = 'https://wwvy.lanzouo.com/i527V37opr4b'
+  const url = 'https://wwvy.lanzouo.com/iPNGu37snuna'
   window.open(url, '_blank')
   Message.success('正在打开代理播放器下载页面')
 }

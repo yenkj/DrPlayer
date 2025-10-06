@@ -276,6 +276,13 @@ const refreshPage = () => {
   window.location.reload();
 };
 
+// 处理重载源事件
+const handleReloadSource = (event) => {
+  console.log('收到重载源事件:', event.detail);
+  // 执行重载源功能（相当于点击重载源按钮）
+  refreshPage();
+};
+
 const minimize = () => {};
 const maximize = () => {};
 const closeWindow = () => {};
@@ -803,6 +810,9 @@ onMounted(async () => {
   getData(); // 页面加载时获取数据
   getNowSite(); // 获取储存的当前源
   
+  // 监听重载源事件
+  window.addEventListener('reloadSource', handleReloadSource);
+  
   // 检查是否需要恢复搜索状态
     const restoreSearch = route.query._restoreSearch;
     const returnToActiveKey = route.query._returnToActiveKey;
@@ -949,6 +959,9 @@ onBeforeUnmount(() => {
   if (timer.value) {
     clearInterval(timer.value); // 销毁时清除定时器
   }
+  
+  // 移除重载源事件监听器
+  window.removeEventListener('reloadSource', handleReloadSource);
   
   // 保存当前页面状态
   if (currentActiveKey.value && videoListRef.value) {
