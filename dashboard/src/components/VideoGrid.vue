@@ -25,10 +25,16 @@
               <!-- 文件夹图标 (当vod_pic为空且是文件夹时) -->
               <div v-else-if="video.vod_tag && video.vod_tag.includes('folder')" class="folder-icon-container">
                 <i class="iconfont icon-wenjianjia folder-icon"></i>
+<!--                <svg style="width:30%">-->
+<!--                  <use :href="`#icon-wenjianjia`"></use>-->
+<!--                </svg>-->
               </div>
               <!-- 文件类型图标 (当vod_pic为空且是目录模式下的非文件夹项目时) -->
               <div v-else-if="video.vod_tag && !video.vod_tag.includes('folder')" class="file-icon-container">
-                <i class="iconfont file-type-icon" :class="getFileTypeIcon(video.vod_name)"></i>
+<!--                <i class="iconfont file-type-icon" :class="getFileTypeIcon(video.vod_name)"></i>-->
+                <svg style="width:30%">
+                  <use :href="`#${getFileTypeIcon(video.vod_name)}`"></use>
+                </svg>
               </div>
               <!-- 默认图片 (当vod_pic为空且没有vod_tag时) -->
               <a-image
@@ -239,7 +245,7 @@ const handleT4ActionCall = async (actionName) => {
       currentActionData.value = result.action;
       showActionRenderer.value = true;
     } else if(result){
-      showToast('执行源内搜索', 'success')
+      showToast(result, 'success')
     }else {
       // 如果没有返回action配置，显示错误提示
       Message.error({
