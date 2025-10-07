@@ -192,15 +192,20 @@ const checkContentHeight = () => {
       contentHeight = scrollContainer.scrollHeight;
       const clientHeight = scrollContainer.clientHeight;
       
+      // 计算理想的容器高度（基于窗口大小）
+      const windowHeight = window.innerHeight || document.documentElement.clientHeight || 600;
+      const idealHeight = Math.max(windowHeight - 200, 400);
+      
       // 如果内容高度小于等于容器高度，说明无法产生滚动
       if (contentHeight <= clientHeight && props.videos && props.videos.length > 0) {
         // 检查是否还有更多数据可以加载
         const hasMoreData = props.hasMore !== false;
         
         if (hasMoreData) {
-          // 减小容器高度以强制产生滚动条，但不能太小
-          const minHeight = Math.min(400, contentHeight - 50);
-          if (minHeight > 200 && containerHeight > minHeight) {
+          // 减小容器高度以强制产生滚动条，但降低幅度要小，只需要能产生滚动即可
+          // 减少200px的降低量，只降低必要的最小高度
+          const minHeight = Math.min(670, contentHeight - 10); // 从contentHeight-50改为contentHeight-10，减少降低幅度
+          if (minHeight > 470 && containerHeight > minHeight) { // 从200改为400，减少过度降低
             containerHeight = minHeight;
             containerHeightTrigger.value++;
             
@@ -214,7 +219,7 @@ const checkContentHeight = () => {
             if (autoLoadTimer) clearTimeout(autoLoadTimer);
             autoLoadTimer = setTimeout(() => {
               checkAutoLoadMore();
-            }, 500);
+            }, 100); // 减少延迟时间
           } else {
             // 如果容器已经很小了，直接触发加载更多
             console.log('[DEBUG] 容器已达最小高度，直接触发加载更多');
@@ -222,6 +227,21 @@ const checkContentHeight = () => {
           }
         } else {
           console.log('[DEBUG] 没有更多数据可加载，保持当前状态');
+        }
+      } else if (contentHeight > clientHeight) {
+        // 内容高度大于容器高度，说明可以产生滚动
+        // 检查是否需要恢复到理想高度
+        if (containerHeight < idealHeight && contentHeight >= idealHeight * 0.8) {
+          // 如果当前容器高度小于理想高度，且内容足够多，则恢复到理想高度
+          containerHeight = idealHeight;
+          containerHeightTrigger.value++;
+          
+          console.log('[DEBUG] 恢复容器高度到理想高度:', {
+            contentHeight,
+            clientHeight,
+            idealHeight,
+            newContainerHeight: containerHeight
+          });
         }
       }
     } catch (error) {
@@ -253,6 +273,42 @@ const checkAutoLoadMore = () => {
     }
   } catch (error) {
     console.error('checkAutoLoadMore error:', error);
+  }
+};
+
+// 检查并恢复容器高度到理想状态
+const checkHeightRestore = () => {
+  if (isProcessing) return;
+  
+  try {
+    const container = containerRef.value;
+    if (!container) return;
+    
+    const scrollContainer = container.querySelector('.arco-scrollbar-container');
+    if (!scrollContainer) return;
+    
+    const contentHeight = scrollContainer.scrollHeight;
+    const clientHeight = scrollContainer.clientHeight;
+    
+    // 计算理想的容器高度
+    const windowHeight = window.innerHeight || document.documentElement.clientHeight || 600;
+    const idealHeight = Math.max(windowHeight - 200, 400);
+    
+    // 如果内容足够多且当前容器高度小于理想高度，则恢复
+    if (contentHeight > idealHeight * 0.8 && containerHeight < idealHeight) {
+      containerHeight = idealHeight;
+      containerHeightTrigger.value++;
+      
+      console.log('[DEBUG] 主动恢复容器高度:', {
+        contentHeight,
+        clientHeight,
+        idealHeight,
+        oldContainerHeight: containerHeight,
+        newContainerHeight: idealHeight
+      });
+    }
+  } catch (error) {
+    console.error('checkHeightRestore error:', error);
   }
 };
 
@@ -444,6 +500,11 @@ const handleScroll = (e) => {
   if (scrollHeight - scrollTop < 50) {
     emit('scroll-bottom');
     emit('load-more');
+    
+    // 延迟检查高度恢复，因为加载更多内容后可能需要恢复高度
+    setTimeout(() => {
+      checkHeightRestore();
+    }, 200); // 减少延迟时间，让高度恢复更快
   }
 };
 
@@ -598,8 +659,12 @@ watch([() => props.videos, () => props.showStats], ([newVideos, newShowStats]) =
       console.log('Videos updated:', newVideos.length);
       // 检查内容高度
       checkContentHeight();
+      // 延迟检查高度恢复，确保内容已经渲染完成
+      setTimeout(() => {
+        checkHeightRestore();
+      }, 50); // 减少延迟时间，让用户无感知
     }
-  }, 300); // 增加延迟时间
+  }, 50); // 大幅减少延迟时间，让高度调整更快响应
   
   updateTimer._lastUpdate = Date.now();
 }, { deep: false, flush: 'post' }); // 使用post flush避免同步更新
