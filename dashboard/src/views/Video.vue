@@ -648,6 +648,8 @@ const closeSpecialCategory = () => {
 // 防止递归更新的标志
 let isUpdatingFolderState = false;
 let updateTimeout = null;
+let lastNavigationData = null;
+let lastNavigationTime = 0;
 
 // 处理folder导航事件
 const handleFolderNavigate = async (navigationData) => {
@@ -659,6 +661,21 @@ const handleFolderNavigate = async (navigationData) => {
   
   // 防止重复更新
   if (isUpdatingFolderState) {
+    console.log('folder状态正在更新中，跳过重复调用');
+    return;
+  }
+  
+  // 防止过于频繁的更新（最小间隔200ms）
+  const now = Date.now();
+  if (now - lastNavigationTime < 200) {
+    console.log('folder导航更新过于频繁，跳过');
+    return;
+  }
+  
+  // 检查是否是相同的导航数据
+  const navigationDataStr = JSON.stringify(navigationData);
+  if (lastNavigationData === navigationDataStr) {
+    console.log('相同的folder导航数据，跳过重复处理');
     return;
   }
   
@@ -669,6 +686,8 @@ const handleFolderNavigate = async (navigationData) => {
   }
   
   isUpdatingFolderState = true;
+  lastNavigationData = navigationDataStr;
+  lastNavigationTime = now;
   
   try {
     // 保存当前状态（进入folder模式时）
