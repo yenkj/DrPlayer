@@ -148,11 +148,21 @@ const emit = defineEmits(['load-more', 'scroll-bottom', 'refresh-list', 'special
 
 const router = useRouter();
 const visitedStore = useVisitedStore();
+
+
+
+
+
 const containerRef = ref(null);
 const scrollbarRef = ref(null);
 // 使用非响应式变量避免递归更新
 let containerHeight = 600; // 默认高度
 const containerHeightTrigger = ref(0); // 仅用于触发重新计算
+
+// 添加内容高度检测相关变量
+let contentHeight = 0;
+let isContentHeightChecking = false;
+let autoLoadTimer = null;
 
 // 计算属性：容器样式
 const containerStyle = computed(() => {
@@ -163,6 +173,88 @@ const containerStyle = computed(() => {
     overflow: 'auto'
   };
 });
+
+// 检测内容高度并智能调整容器高度
+const checkContentHeight = () => {
+  if (isContentHeightChecking || isProcessing) return;
+  
+  isContentHeightChecking = true;
+  
+  nextTick(() => {
+    try {
+      const container = containerRef.value;
+      if (!container) return;
+      
+      // 获取实际内容高度
+      const scrollContainer = container.querySelector('.arco-scrollbar-container');
+      if (!scrollContainer) return;
+      
+      contentHeight = scrollContainer.scrollHeight;
+      const clientHeight = scrollContainer.clientHeight;
+      
+      // 如果内容高度小于等于容器高度，说明无法产生滚动
+      if (contentHeight <= clientHeight && props.videos && props.videos.length > 0) {
+        // 检查是否还有更多数据可以加载
+        const hasMoreData = props.hasMore !== false;
+        
+        if (hasMoreData) {
+          // 减小容器高度以强制产生滚动条，但不能太小
+          const minHeight = Math.min(400, contentHeight - 50);
+          if (minHeight > 200 && containerHeight > minHeight) {
+            containerHeight = minHeight;
+            containerHeightTrigger.value++;
+            
+            console.log('[DEBUG] 调整容器高度以产生滚动条:', {
+              contentHeight,
+              clientHeight,
+              newContainerHeight: containerHeight
+            });
+            
+            // 延迟检查是否需要自动加载更多
+            if (autoLoadTimer) clearTimeout(autoLoadTimer);
+            autoLoadTimer = setTimeout(() => {
+              checkAutoLoadMore();
+            }, 500);
+          } else {
+            // 如果容器已经很小了，直接触发加载更多
+            console.log('[DEBUG] 容器已达最小高度，直接触发加载更多');
+            checkAutoLoadMore();
+          }
+        } else {
+          console.log('[DEBUG] 没有更多数据可加载，保持当前状态');
+        }
+      }
+    } catch (error) {
+      console.error('checkContentHeight error:', error);
+    } finally {
+      isContentHeightChecking = false;
+    }
+  });
+};
+
+// 检查是否需要自动加载更多数据
+const checkAutoLoadMore = () => {
+  if (isProcessing || updateCount >= MAX_UPDATES_PER_SECOND) return;
+  
+  try {
+    const container = containerRef.value;
+    if (!container) return;
+    
+    const scrollContainer = container.querySelector('.arco-scrollbar-container');
+    if (!scrollContainer) return;
+    
+    const scrollHeight = scrollContainer.scrollHeight;
+    const clientHeight = scrollContainer.clientHeight;
+    
+    // 如果内容高度仍然小于等于容器高度，且有更多数据，自动触发加载
+    if (scrollHeight <= clientHeight && props.videos && props.videos.length > 0) {
+      console.log('[DEBUG] 自动触发加载更多数据 - 内容高度不足');
+      emit('load-more');
+    }
+  } catch (error) {
+    console.error('checkAutoLoadMore error:', error);
+  }
+};
 
 // ActionRenderer相关
 const actionRendererRef = ref(null);
@@ -402,6 +494,11 @@ onMounted(() => {
             containerHeight = currentHeight;
             containerHeightTrigger.value++;
           }
+          
+          // 延迟检查内容高度，确保数据已经渲染
+          setTimeout(() => {
+            checkContentHeight();
+          }, 1000);
         }
       } catch (error) {
         console.warn('Initial update failed:', error);
@@ -445,6 +542,11 @@ if (ENABLE_BASIC_UPDATES) {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateScrollAreaHeight);
+  
+  // 清理定时器
+  if (autoLoadTimer) {
+    clearTimeout(autoLoadTimer);
+  }
   
   // 清理MutationObserver
   if (containerRef.value?._filterObserver) {
@@ -494,6 +596,8 @@ watch([() => props.videos, () => props.showStats], ([newVideos, newShowStats]) =
     if (!isProcessing && containerRef.value && !DISABLE_COMPLEX_UPDATES) {
       // 只记录日志，不进行DOM操作
       console.log('Videos updated:', newVideos.length);
+      // 检查内容高度
+      checkContentHeight();
     }
   }, 300); // 增加延迟时间
   
@@ -552,7 +656,9 @@ const handleSpecialAction = (actionType, actionData) => {
 defineExpose({
   checkTextOverflow,
   restoreScrollPosition,
-  getCurrentScrollPosition
+  getCurrentScrollPosition,
+  checkContentHeight,
+  checkAutoLoadMore
 });
 </script>
 

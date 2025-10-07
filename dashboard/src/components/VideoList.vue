@@ -75,13 +75,15 @@
       
       <!-- 推荐分类内容 -->
       <div v-else-if="activeKey === 'recommendTuijian404'" class="tab-content">
+
         <!-- 分类数据获取loading -->
         <div v-if="loadingCategory[activeKey]" class="category-loading-container">
           <a-spin :size="24" />
           <div class="loading-text">正在加载分类数据...</div>
         </div>
+
         <VideoGrid
-          v-else
+          v-if="!loadingCategory[activeKey]"
           :videos="listData[activeKey] || []"
           :loading="loadingMore[activeKey] || false"
           :hasMore="false"
@@ -422,7 +424,13 @@ const getListData = async (key, forceReload = false) => {
     console.log(`分类 ${key} 正在加载中，跳过重复请求`);
     return;
   }
-  
+
+  console.log('listData.hasOwnProperty(key):', listData.hasOwnProperty(key));
+  console.log('forceReload:', forceReload);
+  console.log('listData keys:', Object.keys(listData));
+  console.log('listData[key]:', listData[key]);
+  console.log('listData[key] length:', listData[key]?.length);
+
   if (!listData.hasOwnProperty(key) || forceReload) {
     // 设置分类数据获取loading状态
     loadingCategory[key] = true;
@@ -433,9 +441,11 @@ const getListData = async (key, forceReload = false) => {
       let videoList, pagination;
       if (key === "recommendTuijian404") {
         // 使用传入的推荐视频数据 - 首页推荐数据不允许翻页
+        console.log('recommendTuijian404 recommendVideos:',props.recommendVideos);
         videoList = props.recommendVideos || [];
         // 推荐视频数据不允许翻页
         pagination = { page: 1, hasNext: false };
+
       } else {
         // 获取分类视频，包含筛选参数
         const filters = selectedFilters[key] || {};
@@ -460,10 +470,12 @@ const getListData = async (key, forceReload = false) => {
         }
       }
       
-      // 使用批量更新，减少响应式触发次数
-      Object.assign(listData, { [key]: videoList });
-      Object.assign(pageData, { [key]: pagination });
-      Object.assign(loadingMore, { [key]: false });
+      // 使用直接赋值确保响应式更新
+      listData[key] = [...videoList];
+      pageData[key] = pagination;
+      loadingMore[key] = false;
+      
+
       
       // 更新全局翻页统计信息
       if (key === activeKey.value) {
@@ -682,41 +694,29 @@ const selectCategory = (categoryId) => {
   debouncedUpdateStats(getStatsText(categoryId, folderInfo), 100);
 };
 
-// 添加防护变量避免递归更新
-let isWatchUpdating = false;
-
 // 监听器
 watch(() => props.recommendVideos, (newVideos) => {
-  if (isWatchUpdating) return; // 防止递归更新
+  console.log('[VideoList] recommendVideos watch triggered:', newVideos?.length);
   
-  isWatchUpdating = true;
-  try {
-    if (newVideos && newVideos.length > 0) {
-      listData["recommendTuijian404"] = newVideos;
-      pageData["recommendTuijian404"] = { page: 1, hasNext: false };
-      loadingMore["recommendTuijian404"] = false;
-      console.log("推荐数据已更新:", newVideos.length, "条");
-    } else {
-      listData["recommendTuijian404"] = [];
-      pageData["recommendTuijian404"] = { page: 1, hasNext: false };
-      loadingMore["recommendTuijian404"] = false;
-    }
-    
-    const newActiveKey = getDefaultActiveKey();
-    if (activeKey.value !== newActiveKey) {
-      activeKey.value = newActiveKey;
-      // 延迟调用getListData，避免同步递归
-      setTimeout(() => {
-        if (!isWatchUpdating) return;
-        getListData(newActiveKey);
-        emit('activeKeyChange', newActiveKey);
-      }, 50);
-    }
-  } finally {
-    // 延迟重置防护变量
-    setTimeout(() => {
-      isWatchUpdating = false;
-    }, 100);
+  if (newVideos && newVideos.length > 0) {
+    // 直接赋值，确保响应式更新
+    listData["recommendTuijian404"] = [...newVideos];
+    pageData["recommendTuijian404"] = { page: 1, hasNext: false };
+    loadingMore["recommendTuijian404"] = false;
+    loadingCategory["recommendTuijian404"] = false;
+    console.log("推荐数据已更新:", newVideos.length, "条");
+  } else {
+    listData["recommendTuijian404"] = [];
+    pageData["recommendTuijian404"] = { page: 1, hasNext: false };
+    loadingMore["recommendTuijian404"] = false;
+    loadingCategory["recommendTuijian404"] = false;
+  }
+  
+  // 如果当前activeKey是推荐分类，确保界面更新
+  if (activeKey.value === "recommendTuijian404") {
+    console.log('[VideoList] 当前是推荐分类，强制更新界面');
+    // 触发响应式更新
+    activeKey.value = "recommendTuijian404";
   }
 }, { immediate: true });
 
@@ -812,13 +812,36 @@ watch(() => props.sourceRoute?.query?.activeKey, (newActiveKey) => {
 }, { immediate: true });
 
 onMounted(() => {
-  activeKey.value = getDefaultActiveKey();
+  // 优先使用父组件传递的activeKey，如果没有则使用默认值
+  const parentActiveKey = props.sourceRoute?.query?.activeKey;
+  const targetActiveKey = parentActiveKey || getDefaultActiveKey();
   
-  // 始终加载数据，不管是否有returnToActiveKey参数
-  // 这样可以确保刷新页面时数据能正常显示
-  getListData(activeKey.value);
+  console.log('[DEBUG] VideoList onMounted - parentActiveKey:', parentActiveKey, 'targetActiveKey:', targetActiveKey);
   
-  emit('activeKeyChange', activeKey.value);
+  activeKey.value = targetActiveKey;
+  
+  // 对于推荐分类，确保loading状态正确
+  if (targetActiveKey === "recommendTuijian404") {
+    loadingCategory[targetActiveKey] = false;
+    // 如果已有推荐数据，直接使用，不需要再调用getListData
+    if (props.recommendVideos && props.recommendVideos.length > 0) {
+      listData[targetActiveKey] = [...props.recommendVideos];
+      pageData[targetActiveKey] = { page: 1, hasNext: false };
+      loadingMore[targetActiveKey] = false;
+      console.log('[DEBUG] 推荐数据已设置，跳过getListData调用');
+    } else {
+      // 如果没有推荐数据，才调用getListData
+      getListData(activeKey.value);
+    }
+  } else {
+    // 非推荐分类，始终加载数据
+    getListData(activeKey.value);
+  }
+  
+  // 只有当使用默认值时才emit，避免覆盖父组件的activeKey
+  if (!parentActiveKey) {
+    emit('activeKeyChange', activeKey.value);
+  }
 });
 
 onBeforeUnmount(() => {
