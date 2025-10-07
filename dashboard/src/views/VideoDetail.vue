@@ -2133,6 +2133,8 @@ onUnmounted(() => {
   max-height: 120px;
   overflow: hidden;
   transition: max-height 0.3s ease;
+  white-space: pre-wrap; /* 支持换行符显示 */
+  word-wrap: break-word; /* 长单词自动换行 */
 }
 
 .description-content.expanded {
