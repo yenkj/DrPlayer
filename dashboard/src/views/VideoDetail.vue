@@ -180,11 +180,12 @@
             <div v-if="currentEpisodeUrl" class="play-actions">
               <a-button type="primary" size="large" @click="playVideo" class="play-btn">
                 <template #icon>
-                  <icon-play-arrow v-if="!isNovelContent && !isComicContent" />
-                  <icon-book v-else-if="isNovelContent" />
-                  <icon-image v-else-if="isComicContent" />
+                  <icon-play-arrow v-if="smartPlayButton.icon === 'icon-play-arrow'" />
+                  <icon-book v-else-if="smartPlayButton.icon === 'icon-book'" />
+                  <icon-image v-else-if="smartPlayButton.icon === 'icon-image'" />
+                  <icon-sound v-else-if="smartPlayButton.icon === 'icon-sound'" />
                 </template>
-                {{ isNovelContent ? '开始阅读' : isComicContent ? '开始看漫画' : '播放视频' }}
+                {{ smartPlayButton.text }}
               </a-button>
               <a-button @click="copyPlayUrl" class="copy-btn">
                 <template #icon>
@@ -321,7 +322,8 @@ import {
   IconEye,
   IconBook,
   IconImage,
-  IconRefresh
+  IconRefresh,
+  IconSound
 } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
@@ -560,6 +562,48 @@ const isNovelContent = computed(() => {
 // 判断当前内容是否为漫画
 const isComicContent = computed(() => {
   return showComicReader.value
+})
+
+// 智能播放按钮配置 - 根据站源名称标识显示不同的按钮文本和图标
+const smartPlayButton = computed(() => {
+  // 获取当前站源名称
+  const siteName = currentSiteInfo.value?.name || ''
+  
+  // 根据站源名称的标识判断内容类型
+  if (siteName.includes('[书]')) {
+    return {
+      text: '开始阅读',
+      icon: 'icon-book'
+    }
+  } else if (siteName.includes('[听]')) {
+    return {
+      text: '播放音频',
+      icon: 'icon-sound'
+    }
+  } else if (siteName.includes('[画]')) {
+    return {
+      text: '查看图片',
+      icon: 'icon-image'
+    }
+  } else {
+    // 默认情况，也要考虑现有的小说和漫画判断逻辑
+    if (isNovelContent.value) {
+      return {
+        text: '开始阅读',
+        icon: 'icon-book'
+      }
+    } else if (isComicContent.value) {
+      return {
+        text: '查看图片',
+        icon: 'icon-image'
+      }
+    } else {
+      return {
+        text: '播放视频',
+        icon: 'icon-play-arrow'
+      }
+    }
+  }
 })
 
 // 方法
