@@ -1390,6 +1390,14 @@ const selectEpisode = async (index) => {
       currentActiveSite: currentActiveSiteInfo.value?.key,
       originalSite: currentSiteInfo.value?.key
     })
+    
+    // 检测选集URL本身是否为push://协议
+    if (episodeUrl.startsWith('push://')) {
+      console.log('🚀🚀🚀 选集URL本身为push://协议，直接处理推送逻辑:', episodeUrl)
+      await handlePushProtocol(episodeUrl, routeName)
+      return
+    }
+    
     Message.info('正在解析播放地址...')
     
     // 调用T4播放API进行解析
@@ -1403,9 +1411,9 @@ const selectEpisode = async (index) => {
     const parseResult = await videoService.parseEpisodePlayUrl(currentActiveSiteInfo.value.key, parseParams)
     console.log('选集播放解析结果:', parseResult)
     
-    // 检测是否为push://协议
+    // 检测T4播放API返回结果是否为push://协议
     if (parseResult.url && parseResult.url.startsWith('push://')) {
-      console.log('🚀🚀🚀 检测到push://协议，开始处理推送逻辑:', parseResult.url)
+      console.log('🚀🚀🚀 T4播放API返回push://协议，开始处理推送逻辑:', parseResult.url)
       await handlePushProtocol(parseResult.url, parseResult.flag)
       return
     }
