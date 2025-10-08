@@ -17,8 +17,22 @@
           </span>
         </span>
       </div>
-      <!-- 收藏按钮 -->
+      <!-- 操作按钮 -->
       <div class="header-actions" v-if="originalVideoInfo.id">
+        <!-- 清除推送覆盖按钮 -->
+        <a-button 
+          v-if="hasPushOverride"
+          type="outline"
+          status="warning"
+          @click="clearPushOverride"
+          class="clear-push-btn"
+        >
+          <template #icon>
+            <icon-refresh />
+          </template>
+          恢复原始数据
+        </a-button>
+        <!-- 收藏按钮 -->
         <a-button 
           :type="isCurrentFavorited ? 'primary' : 'outline'"
           @click="toggleFavorite"
@@ -280,10 +294,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Message } from '@arco-design/web-vue'
 import videoService from '@/api/services/video'
+import siteService from '@/api/services/site'
 import { sniffVideoWithConfig, isSnifferEnabled } from '@/api/services/sniffer'
 import ParserService from '@/api/services/parser'
 import { useSiteStore } from '@/stores/siteStore'
@@ -305,7 +320,8 @@ import {
   IconHeartFill,
   IconEye,
   IconBook,
-  IconImage
+  IconImage,
+  IconRefresh
 } from '@arco-design/web-vue/es/icon'
 
 const route = useRoute()
@@ -345,6 +361,20 @@ const currentSiteInfo = ref({
   api: '',
   key: ''
 })
+
+// 推送协议相关状态
+const isPushMode = ref(false)
+// 推送覆盖标记，用于标识是否发生过推送覆盖需要强制刷新
+// 使用sessionStorage持久化状态，避免组件重新创建时丢失
+const hasPushOverride = ref(sessionStorage.getItem('hasPushOverride') === 'true')
+// 当前活跃的源信息（推送模式下为push_agent，正常模式下为原始源）
+const currentActiveSiteInfo = ref(null)
+
+// 监听hasPushOverride变化，自动保存到sessionStorage
+watch(hasPushOverride, (newValue) => {
+  sessionStorage.setItem('hasPushOverride', newValue.toString())
+  console.log('🔄 [状态持久化] hasPushOverride状态已保存:', newValue)
+}, { immediate: true })
 
 // 视频播放器相关
 const showVideoPlayer = ref(false)
@@ -535,6 +565,12 @@ const isComicContent = computed(() => {
 // 方法
 
 const loadVideoDetail = async () => {
+  console.log('🔄 loadVideoDetail 函数被调用，开始加载详情数据:', {
+    id: route.params.id,
+    fullPath: route.fullPath,
+    timestamp: new Date().toLocaleTimeString()
+  })
+  
   if (!route.params.id) {
     error.value = '视频ID不能为空'
     return
@@ -542,6 +578,9 @@ const loadVideoDetail = async () => {
 
   // 重置图片错误计数器
   imageErrorCount.value = 0
+
+  // 重置推送状态
+  isPushMode.value = false
 
   // 从路由参数中获取原始视频信息
   originalVideoInfo.value = {
@@ -613,6 +652,9 @@ const loadVideoDetail = async () => {
       ext: extend
     }
     
+    // 初始化当前活跃源信息为原始源
+    currentActiveSiteInfo.value = currentSiteInfo.value
+    
     console.log('获取视频详情:', {
       videoId: route.params.id,
       module: module,
@@ -678,6 +720,8 @@ const loadVideoDetail = async () => {
     error.value = err.message || '加载失败，请稍后重试'
   } finally {
     loading.value = false
+    // 注意：不在这里清除hasPushOverride标记，因为可能是正常的路由变化触发的加载
+    // hasPushOverride标记只在真正因为推送覆盖而重新加载时才清除
   }
 }
 
@@ -728,6 +772,80 @@ const toggleFavorite = async () => {
     console.error('收藏操作失败:', error)
   } finally {
     favoriteLoading.value = false
+  }
+}
+
+// 清除推送覆盖状态
+const clearPushOverride = async () => {
+  try {
+    console.log('🔄 [用户操作] 手动清除推送覆盖状态')
+    
+    // 清除推送覆盖标记
+    hasPushOverride.value = false
+    isPushMode.value = false
+    
+    // 清除sessionStorage中的推送状态
+    sessionStorage.removeItem('hasPushOverride')
+    
+    // 确保使用原始站源信息
+    if (!siteStore.nowSite) {
+      Message.error('无法恢复：当前没有选择视频源')
+      return
+    }
+    
+    const originalSite = siteStore.nowSite
+    currentSiteInfo.value = {
+      name: originalSite.name,
+      api: originalSite.api,
+      key: originalSite.key || originalSite.name,
+      ext: originalSite.ext || null
+    }
+    
+    // 重置为原始源信息
+    currentActiveSiteInfo.value = currentSiteInfo.value
+    
+    console.log('🔄 [推送覆盖] 使用原始站源重新加载:', currentSiteInfo.value)
+    
+    // 重新加载原始数据，强制使用当前全局站源
+    loading.value = true
+    error.value = ''
+    
+    // 清除相关缓存，确保获取最新数据
+    const cacheKey = `detail_${currentSiteInfo.value.key}_${route.params.id}`
+    console.log('🔄 [推送覆盖] 清除缓存:', cacheKey)
+    videoService.cache.delete(cacheKey)
+    
+    const videoInfo = await videoService.getVideoDetails(
+      currentSiteInfo.value.key, 
+      route.params.id, 
+      currentSiteInfo.value.api, 
+      true, // 强制跳过缓存
+      currentSiteInfo.value.ext
+    )
+    
+    if (videoInfo) {
+      // 添加API信息
+      videoInfo.module = currentSiteInfo.value.key
+      videoInfo.api_url = currentSiteInfo.value.api
+      videoInfo.site_name = currentSiteInfo.value.name
+      
+      videoDetail.value = videoInfo
+      
+      // 重置播放位置
+      currentRoute.value = 0
+      currentEpisode.value = 0
+      
+      console.log('✅ [推送覆盖] 原始数据恢复成功:', videoInfo)
+      Message.success('已恢复原始数据')
+    } else {
+      throw new Error('无法获取原始视频数据')
+    }
+    
+  } catch (error) {
+    console.error('❌ [推送覆盖] 清除推送覆盖状态失败:', error)
+    Message.error(`恢复原始数据失败: ${error.message}`)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -1265,19 +1383,32 @@ const selectEpisode = async (index) => {
   }
 
   try {
-    console.log('开始解析选集播放地址:', { episodeUrl, routeName })
+    console.log('开始解析选集播放地址:', { 
+      episodeUrl, 
+      routeName, 
+      isPushMode: isPushMode.value,
+      currentActiveSite: currentActiveSiteInfo.value?.key,
+      originalSite: currentSiteInfo.value?.key
+    })
     Message.info('正在解析播放地址...')
     
     // 调用T4播放API进行解析
     const parseParams = {
       play: episodeUrl,
       flag: routeName,
-      apiUrl: currentSiteInfo.value.api,
-      extend: currentSiteInfo.value.ext
+      apiUrl: currentActiveSiteInfo.value.api,
+      extend: currentActiveSiteInfo.value.ext
     }
     
-    const parseResult = await videoService.parseEpisodePlayUrl(currentSiteInfo.value.key, parseParams)
+    const parseResult = await videoService.parseEpisodePlayUrl(currentActiveSiteInfo.value.key, parseParams)
     console.log('选集播放解析结果:', parseResult)
+    
+    // 检测是否为push://协议
+    if (parseResult.url && parseResult.url.startsWith('push://')) {
+      console.log('🚀🚀🚀 检测到push://协议，开始处理推送逻辑:', parseResult.url)
+      await handlePushProtocol(parseResult.url, parseResult.flag)
+      return
+    }
     
     // 根据解析结果处理播放
      if (parseResult.playType === 'direct') {
@@ -1533,6 +1664,111 @@ const selectEpisode = async (index) => {
     console.log('=== 调试结束 ===')
     
     historyStore.addToHistory(videoInfo, routeInfo, episodeInfo)
+  }
+}
+
+// 处理push://协议
+const handlePushProtocol = async (pushUrl, flagName) => {
+  try {
+    console.log('🚀🚀🚀 开始处理push://协议:', pushUrl)
+    Message.info('正在处理推送链接...')
+    
+    // 提取push://后面的内容
+    const pushContent = pushUrl.replace('push://', '').trim()
+    console.log('提取的推送内容:', pushContent)
+    
+    // 设置推送模式
+    isPushMode.value = true
+    // 设置推送覆盖标记，表示数据已被推送覆盖，下次进入需要强制刷新
+    hasPushOverride.value = true
+    console.log('🚀 [推送操作] 已设置推送覆盖标记:', {
+      hasPushOverride: hasPushOverride.value,
+      isPushMode: isPushMode.value,
+      timestamp: new Date().toLocaleTimeString()
+    })
+    
+    // 获取push_agent源
+    const pushAgentSite = siteService.getAllSites().find(site => site.key === 'push_agent')
+    if (!pushAgentSite) {
+      throw new Error('未找到push_agent源，请检查源配置')
+    }
+    
+    console.log('找到push_agent源:', pushAgentSite)
+    
+    // 更新当前活跃源信息为push_agent
+    currentActiveSiteInfo.value = pushAgentSite
+    
+    // 调用push_agent源的详情接口
+    console.log('调用push_agent详情接口，参数:', {
+      module: pushAgentSite.key,
+      videoId: pushContent,
+      apiUrl: pushAgentSite.api,
+      extend: pushAgentSite.ext
+    })
+    const pushDetailResult = await videoService.getVideoDetails(
+      pushAgentSite.key,
+      pushContent,
+      pushAgentSite.api,
+      false,
+      pushAgentSite.ext
+    )
+    console.log('push_agent详情接口返回结果:', pushDetailResult)
+    
+    if (!pushDetailResult || !pushDetailResult.vod_play_from || !pushDetailResult.vod_play_url) {
+      throw new Error('push_agent源返回的数据格式不正确，缺少播放信息')
+    }
+    
+    // 更新当前详情页的线路和选集数据
+    videoDetail.value.vod_play_from = pushDetailResult.vod_play_from
+    videoDetail.value.vod_play_url = pushDetailResult.vod_play_url
+    
+    // 更新其他必要的详情数据（只保留播放相关的核心字段）
+    const updatedFields = []
+    
+    // 只更新播放相关的核心字段，避免显示过多不必要的属性
+    const allowedFields = {
+      'vod_content': '剧情简介',
+      'vod_id': '视频ID', 
+      'vod_pic': '封面图片',
+      'vod_name': '视频名称',
+      'vod_remarks': '备注信息',
+      'vod_actor': '演员',
+      'vod_director': '导演',
+      'vod_year': '年份',
+      'vod_area': '地区',
+      'vod_lang': '语言',
+      'vod_class': '分类'
+    }
+    
+    Object.keys(allowedFields).forEach(field => {
+      if (pushDetailResult[field] !== undefined && pushDetailResult[field] !== null && pushDetailResult[field] !== '') {
+        videoDetail.value[field] = pushDetailResult[field]
+        updatedFields.push(allowedFields[field])
+      }
+    })
+    
+    // 重置当前线路和选集
+    currentRoute.value = 0
+    currentEpisode.value = 0
+    
+    console.log('推送数据更新完成，新的播放信息:', {
+      vod_play_from: videoDetail.value.vod_play_from,
+      vod_play_url: videoDetail.value.vod_play_url,
+      updatedFields: updatedFields
+    })
+    
+    const updateMessage = updatedFields.length > 0 
+      ? `推送成功: ${flagName || '未知来源'} (已更新: ${updatedFields.join('、')})`
+      : `推送成功: ${flagName || '未知来源'}`
+    Message.success(updateMessage)
+    
+  } catch (error) {
+    console.error('处理push://协议失败:', error)
+    Message.error(`推送失败: ${error.message}`)
+    
+    // 推送失败时重置推送状态和源信息
+    isPushMode.value = false
+    currentActiveSiteInfo.value = currentSiteInfo.value
   }
 }
 
@@ -1792,11 +2028,12 @@ const copyPlayUrl = async () => {
 // 监听路由变化（包括参数和查询参数）
 watch(() => [route.params.id, route.query], () => {
   if (route.params.id) {
-    console.log('检测到路由变化，重新加载视频详情:', {
+    console.log('🔍 [params监听器] 检测到路由变化，重新加载视频详情:', {
       id: route.params.id,
       fromCollection: route.query.fromCollection,
       name: route.query.name,
-      folderState: route.query.folderState
+      folderState: route.query.folderState,
+      timestamp: new Date().toLocaleTimeString()
     })
     
     // 保存初始的folderState（仅在首次加载时保存）
@@ -1811,6 +2048,29 @@ watch(() => [route.params.id, route.query], () => {
     loadVideoDetail()
   }
 }, { immediate: true, deep: true })
+
+// 监听路由完整路径变化，只在推送覆盖后才强制重新加载数据
+watch(() => route.fullPath, (newPath, oldPath) => {
+  console.log('🔍 [fullPath监听器] 路由fullPath变化监听器触发:', {
+    newPath,
+    oldPath,
+    hasVideoInPath: newPath?.includes('/video/'),
+    hasId: !!route.params.id,
+    pathChanged: newPath !== oldPath,
+    hasPushOverride: hasPushOverride.value,
+    timestamp: new Date().toLocaleTimeString()
+  })
+  
+  // fullPath监听器现在只负责记录路径变化，推送覆盖的处理交给onActivated
+  if (newPath && newPath.includes('/video/') && newPath !== oldPath && route.params.id) {
+    console.log('ℹ️ [fullPath监听器] 检测到路径变化，但推送覆盖处理已交给onActivated:', {
+      oldPath,
+      newPath,
+      id: route.params.id,
+      hasPushOverride: hasPushOverride.value
+    })
+  }
+}, { immediate: true })
 
 // 监听站点变化，换源后重新加载详情
 watch(() => siteStore.nowSite, (newSite, oldSite) => {
@@ -1839,9 +2099,39 @@ onMounted(async () => {
   }
 })
 
+// 组件激活时检查是否需要重新加载数据（处理缓存组件的情况）
+onActivated(() => {
+  console.log('🔄 [组件激活] VideoDetail组件激活:', {
+    hasPushOverride: hasPushOverride.value,
+    isPushMode: isPushMode.value,
+    routeId: route.params.id,
+    timestamp: new Date().toLocaleTimeString()
+  })
+  
+  // 如果有推送覆盖标记，强制重新加载数据
+  if (hasPushOverride.value && route.params.id) {
+    console.log('✅ [组件激活] 检测到推送覆盖，强制重新加载数据')
+    // 注意：不要在这里清除推送覆盖标记，让用户手动清除或在适当的时机清除
+    // 这样可以保持推送覆盖状态，直到用户明确要恢复原始数据
+    loadVideoDetail()
+  } else {
+    console.log('ℹ️ [组件激活] 未检测到推送覆盖标记，跳过强制重新加载:', {
+      hasPushOverride: hasPushOverride.value,
+      hasRouteId: !!route.params.id,
+      routeId: route.params.id,
+      condition1: hasPushOverride.value,
+      condition2: !!route.params.id,
+      bothConditions: hasPushOverride.value && route.params.id
+    })
+  }
+})
+
 // 组件卸载时清理资源
 onUnmounted(() => {
   console.log('VideoDetail组件卸载')
+  // 注意：不要在这里清理推送覆盖状态，因为用户可能会返回详情页
+  // 推送覆盖状态应该由用户手动清除或在明确的时机清除
+  console.log('🔄 [状态清理] 组件卸载，保留推送覆盖状态以便用户返回时恢复')
 })
 </script>
 
