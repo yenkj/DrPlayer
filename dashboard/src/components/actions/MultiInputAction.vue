@@ -92,7 +92,6 @@
                     }"
                     format="YYYY-MM-DD"
                     @change="handleDateChange(index, $event)"
-                    :popup-container="'body'"
                   />
                 </div>
               </div>
@@ -1293,21 +1292,40 @@ export default {
 
     // 文件夹选择处理
     const handleFolderSelect = (index) => {
+      // 创建一个隐藏的文件夹选择器
       const input = document.createElement('input')
       input.type = 'file'
       input.webkitdirectory = true
+      input.multiple = true
       input.style.position = 'absolute'
       input.style.left = '-9999px'
+      input.style.opacity = '0'
       document.body.appendChild(input)
       
       input.addEventListener('change', (e) => {
-        if (e.target.files && e.target.files[0]) {
-          // 获取文件夹路径（去掉文件名）
-          const path = e.target.files[0].webkitRelativePath
-          const folderPath = path.substring(0, path.lastIndexOf('/'))
-          inputValues.value[index] = folderPath || e.target.files[0].name
+        if (e.target.files && e.target.files.length > 0) {
+          // 从第一个文件的路径中提取文件夹路径
+          const firstFile = e.target.files[0]
+          const relativePath = firstFile.webkitRelativePath
+          
+          if (relativePath) {
+            // 获取文件夹名称（第一级目录）
+            const folderName = relativePath.split('/')[0]
+            inputValues.value[index] = folderName
+          } else {
+            // 如果没有相对路径，使用文件名去掉扩展名
+            const fileName = firstFile.name
+            const folderName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName
+            inputValues.value[index] = folderName
+          }
+          
           validateInput(index)
         }
+        document.body.removeChild(input)
+      })
+      
+      // 添加取消事件监听
+      input.addEventListener('cancel', () => {
         document.body.removeChild(input)
       })
       
@@ -1862,8 +1880,25 @@ export default {
 
 /* 确保日期选择器面板正确显示 */
 .date-picker-modern :deep(.arco-picker-dropdown) {
-  z-index: 9999;
+  z-index: 9999 !important;
 }
+
+/* 修复日期选择器弹出层样式 */
+.date-picker-modern :deep(.arco-picker-panel) {
+  z-index: 9999 !important;
+}
+
+.date-picker-modern :deep(.arco-picker-popup) {
+  z-index: 9999 !important;
+}
+
+/* 确保日期选择器容器不被遮挡 */
+.date-picker-modern :deep(.arco-picker-container) {
+  position: relative;
+  z-index: 1;
+}
+
+
 
 /* 输入操作按钮 */
 .input-actions {
