@@ -63,8 +63,8 @@
 
             <!-- 输入区域 -->
             <div class="input-group">
-              <!-- 快速选择 - 在输入框上方，只显示非特殊选择器 -->
-              <div v-if="input.selectData && hasNonSpecialOptions(input.selectData)" class="quick-select">
+              <!-- 快速选择 - 在输入框上方，只显示非特殊选择器，且非多选模式 -->
+              <div v-if="input.selectData && hasNonSpecialOptions(input.selectData) && !input.multiSelect" class="quick-select">
                 <div class="quick-select-options">
                   <button
                     v-for="option in getNonSpecialOptions(input.selectData)"
@@ -429,34 +429,72 @@
    <!-- 选项弹窗 -->
    <ActionDialog
      :visible="showSelectOptions"
-     title="请选择"
-     :width="400"
+     :title="isMultiSelectMode ? '请选择字母' : '请选择'"
+     :width="isMultiSelectMode ? (currentSelectColumn * 160 + 200) : 400"
      @close="showSelectOptions = false"
    >
      <div class="select-options-content">
-       <a-radio-group 
-         v-model="selectedRadioValue" 
-         @change="handleRadioChange"
-         direction="vertical"
-         class="radio-options-list"
-       >
-         <a-radio
-           v-for="option in currentSelectOptions"
-           :key="option.value"
-           :value="option.value"
-           class="radio-option-item"
+       <!-- 单选模式 -->
+       <div v-if="!isMultiSelectMode" class="radio-container">
+         <a-radio-group 
+           v-model="selectedRadioValue"
+           @change="handleRadioChange"
+           direction="vertical"
+           class="radio-options-list"
          >
-           {{ option.name }}
-         </a-radio>
-       </a-radio-group>
+           <a-radio
+             v-for="option in currentSelectOptions"
+             :key="option.value"
+             :value="option.value"
+             class="radio-option-item"
+           >
+             {{ option.name }}
+           </a-radio>
+         </a-radio-group>
+       </div>
+
+       <!-- 多选模式 -->
+       <div v-else class="multiselect-container">
+         <div class="multiselect-main">
+           <a-checkbox-group 
+             v-model="selectedCheckboxValues"
+             class="checkbox-grid"
+             :style="{ gridTemplateColumns: `repeat(${currentSelectColumn}, 1fr)` }"
+           >
+             <a-checkbox
+               v-for="option in currentSelectOptions"
+               :key="option.value"
+               :value="option.value"
+               class="checkbox-option-item"
+             >
+               {{ option.name }}
+             </a-checkbox>
+           </a-checkbox-group>
+         </div>
+         
+         <div class="multiselect-actions">
+           <button class="btn-modern btn-secondary btn-small" @click="selectAll">
+             全选
+           </button>
+           <button class="btn-modern btn-secondary btn-small" @click="clearSelection">
+              全清
+            </button>
+           <button class="btn-modern btn-secondary btn-small" @click="invertSelection">
+             反选
+           </button>
+           <button class="btn-modern btn-primary btn-small" @click="confirmMultiSelection">
+             确定
+           </button>
+         </div>
+       </div>
      </div>
 
-     <template #footer>
+     <template #footer v-if="!isMultiSelectMode">
        <div class="modern-footer">
          <button class="btn-modern btn-secondary" @click="showSelectOptions = false">
            取消
          </button>
-         <button class="btn-modern btn-primary" @click="confirmSelection">
+         <button class="btn-modern btn-primary" @click="confirmRadioSelection">
            确认
          </button>
        </div>
@@ -477,7 +515,7 @@ import { executeAction } from '@/api/modules/module.js'
 import { showToast } from '@/stores/toast.js'
 import siteService from '@/api/services/site'
 import { useRouter } from 'vue-router'
-import { DatePicker, Radio, RadioGroup } from '@arco-design/web-vue'
+import { DatePicker, Radio, RadioGroup, Checkbox, CheckboxGroup } from '@arco-design/web-vue'
 
 export default {
   name: 'MultiInputAction',
@@ -485,7 +523,9 @@ export default {
     ActionDialog,
     DatePicker,
     'a-radio': Radio,
-    'a-radio-group': RadioGroup
+    'a-radio-group': RadioGroup,
+    'a-checkbox': Checkbox,
+    'a-checkbox-group': CheckboxGroup
   },
   props: {
     config: {
@@ -536,6 +576,11 @@ export default {
     const currentSelectIndex = ref(-1)
     const currentSelectOptions = ref([])
     const selectedRadioValue = ref('')
+    
+    // 多选相关
+    const selectedCheckboxValues = ref([])
+    const isMultiSelectMode = ref(false)
+    const currentSelectColumn = ref(4)
 
     // 帮助弹窗相关
     const showHelpDialog = ref(false)
@@ -1036,8 +1081,20 @@ export default {
       if (input.selectData) {
         currentSelectIndex.value = index
         currentSelectOptions.value = parseSelectData(input.selectData)
-        // 设置当前选中的值
-        selectedRadioValue.value = inputValues.value[index] || ''
+        
+        // 判断是否为多选模式
+        isMultiSelectMode.value = input.multiSelect === true
+        currentSelectColumn.value = input.selectColumn || 4
+        
+        if (isMultiSelectMode.value) {
+          // 多选模式：解析已选中的值
+          const currentValue = inputValues.value[index] || ''
+          selectedCheckboxValues.value = currentValue ? currentValue.split(',').map(v => v.trim()).filter(v => v) : []
+        } else {
+          // 单选模式：设置当前选中的值
+          selectedRadioValue.value = inputValues.value[index] || ''
+        }
+        
         showSelectOptions.value = true
       }
     }
@@ -1061,12 +1118,53 @@ export default {
       }
     }
 
-    // 确认选择
-    const confirmSelection = () => {
+    // 确认单选
+    const confirmRadioSelection = () => {
       showSelectOptions.value = false
       currentSelectIndex.value = -1
       currentSelectOptions.value = []
       selectedRadioValue.value = ''
+    }
+
+
+
+
+
+
+
+    // 全选
+    const selectAll = () => {
+      selectedCheckboxValues.value = currentSelectOptions.value.map(option => option.value)
+    }
+
+    // 全清选择
+    const clearSelection = () => {
+      selectedCheckboxValues.value = []
+    }
+
+    // 反选
+    const invertSelection = () => {
+      const allValues = currentSelectOptions.value.map(option => option.value)
+      selectedCheckboxValues.value = allValues.filter(value => !selectedCheckboxValues.value.includes(value))
+    }
+
+    // 确认选择（单选和多选）
+    const confirmMultiSelection = () => {
+      if (currentSelectIndex.value >= 0) {
+        if (isMultiSelectMode.value) {
+          // 多选模式：将选中的值用逗号连接
+          inputValues.value[currentSelectIndex.value] = selectedCheckboxValues.value.join(',')
+        } else {
+          // 单选模式：只取第一个值
+          inputValues.value[currentSelectIndex.value] = selectedCheckboxValues.value[0] || ''
+        }
+        validateInput(currentSelectIndex.value)
+      }
+      showSelectOptions.value = false
+      currentSelectIndex.value = -1
+      currentSelectOptions.value = []
+      selectedCheckboxValues.value = []
+      isMultiSelectMode.value = false
     }
 
     // 判断是否为特殊选择器
@@ -1388,8 +1486,16 @@ export default {
       openSelectOptions,
       selectOption,
       handleRadioChange,
-      confirmSelection,
+      confirmRadioSelection,
       isOptionSelected,
+      // 多选相关
+      selectedCheckboxValues,
+      isMultiSelectMode,
+      currentSelectColumn,
+      selectAll,
+      clearSelection,
+      invertSelection,
+      confirmMultiSelection,
       // 帮助弹窗
       showHelpDialog,
       helpContent,
@@ -2436,11 +2542,21 @@ export default {
   padding: 16px;
 }
 
+/* 单选容器样式 */
+.radio-container {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--ds-border, #d0d7de);
+  border-radius: 8px;
+  background: var(--ds-surface, #ffffff);
+  padding: 8px;
+}
+
 .radio-options-list {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .radio-option-item {
@@ -2475,11 +2591,11 @@ export default {
 
 .radio-options-list :deep(.arco-radio .arco-radio-label) {
   width: 100%;
-  padding: 12px 16px;
+  padding: 8px 12px;
   margin: 0;
   color: var(--ds-text, #24292f);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.4;
   cursor: pointer;
 }
 
@@ -2489,7 +2605,7 @@ export default {
 }
 
 .radio-options-list :deep(.arco-radio .arco-radio-button) {
-  margin: 8px 0 8px 12px;
+  margin: 6px 0 6px 10px;
 }
 
 .radio-options-list :deep(.arco-radio .arco-radio-button::after) {
@@ -2499,5 +2615,57 @@ export default {
 .radio-options-list :deep(.arco-radio-checked .arco-radio-button) {
   border-color: var(--ds-border-accent, #3b82f6);
   background-color: var(--ds-background-accent, #3b82f6);
+}
+
+/* 多选相关样式 */
+.multiselect-container {
+  display: flex;
+  gap: 16px;
+  min-height: 300px;
+}
+
+.multiselect-main {
+  flex: 1;
+}
+
+.checkbox-grid {
+  display: grid;
+  gap: 12px 16px;
+  padding: 8px;
+}
+
+.checkbox-option-item {
+  padding: 8px 12px;
+  border: 1px solid var(--ds-border, #d1d5db);
+  border-radius: 6px;
+  background: var(--ds-background, #ffffff);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.checkbox-option-item:hover {
+  border-color: var(--ds-border-accent, #3b82f6);
+  background: var(--ds-background-hover, #f8fafc);
+}
+
+.checkbox-option-item :deep(.arco-checkbox-checked .arco-checkbox-icon) {
+  background-color: var(--ds-background-accent, #3b82f6);
+  border-color: var(--ds-border-accent, #3b82f6);
+}
+
+.multiselect-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 80px;
+  padding: 8px;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+  min-height: 32px;
+  white-space: nowrap;
 }
 </style>
