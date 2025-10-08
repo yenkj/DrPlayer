@@ -947,7 +947,8 @@ const addressSettings = reactive({
   liveConfig: '',
   proxyAccess: '',
   proxyAccessEnabled: false,
-  proxyPlay: 'http://localhost:57572/proxy?form=base64&url=${url}&headers=${headers}&type=${type}#嗷呜',
+  // proxyPlay: 'http://localhost:57572/proxy?form=base64&url=${url}&headers=${headers}&type=${type}#嗷呜',
+  proxyPlay: 'http://localhost:5757/file-proxy/proxy?form=base64&auth=drpys&url=${url}&headers=${headers}&type=${type}#DS',
   proxyPlayEnabled: false,
   proxySniff: 'http://localhost:57573/sniffer',
   proxySniffEnabled: false,
@@ -1240,7 +1241,8 @@ const resetProxyPlay = async () => {
   addressSaving.proxyPlayReset = true
   try {
     // 重置为默认值
-    addressSettings.proxyPlay = 'http://localhost:57572/proxy?form=base64&url=${url}&headers=${headers}&type=${type}#嗷呜'
+    // addressSettings.proxyPlay = 'http://localhost:57572/proxy?form=base64&url=${url}&headers=${headers}&type=${type}#嗷呜'
+    addressSettings.proxyPlay = 'http://localhost:5757/file-proxy/proxy?form=base64&auth=drpys&url=${url}&headers=${headers}&type=${type}#DS'
     addressSettings.proxyPlayEnabled = false
     
     // 保存到本地存储
