@@ -441,6 +441,62 @@
               </div>
             </div>
           </div>
+
+          <!-- 访问超时设置 -->
+          <div class="address-config-item">
+            <div class="address-config-row">
+              <div class="address-config-info">
+                <icon-clock-circle class="address-config-icon" />
+                <div class="address-config-text">
+                  <div class="address-config-title">访问超时时间</div>
+                  <div class="address-config-desc">设置T4接口访问的超时时间（秒）</div>
+                </div>
+              </div>
+              <div class="address-config-input-group">
+                <a-input-number 
+                  v-model="addressSettings.apiTimeout" 
+                  placeholder="30"
+                  size="medium"
+                  class="address-config-input"
+                  :min="5"
+                  :max="120"
+                  :step="1"
+                >
+                  <template #suffix>
+                    <span class="input-suffix">秒</span>
+                  </template>
+                </a-input-number>
+                <div class="address-config-actions">
+                  <a-button 
+                    type="primary" 
+                    @click="saveAddress('apiTimeout')"
+                    :loading="addressSaving.apiTimeout"
+                    size="medium"
+                  >
+                    <template #icon>
+                      <icon-save />
+                    </template>
+                    保存
+                  </a-button>
+                </div>
+              </div>
+            </div>
+            <div v-if="addressStatus.apiTimeout && addressStatus.apiTimeout.message" class="address-config-status">
+              <div 
+                class="config-message"
+                :class="{
+                  'config-message-success': addressStatus.apiTimeout.type === 'success',
+                  'config-message-error': addressStatus.apiTimeout.type === 'error',
+                  'config-message-warning': addressStatus.apiTimeout.type === 'warning'
+                }"
+              >
+                <icon-check-circle v-if="addressStatus.apiTimeout.type === 'success'" class="config-icon" />
+                <icon-exclamation-circle v-else-if="addressStatus.apiTimeout.type === 'error'" class="config-icon" />
+                <icon-info-circle v-else class="config-icon" />
+                <span class="config-text">{{ addressStatus.apiTimeout.message }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </a-card>
 
@@ -895,7 +951,8 @@ const addressSettings = reactive({
   proxyPlayEnabled: false,
   proxySniff: 'http://localhost:57573/sniffer',
   proxySniffEnabled: false,
-  snifferTimeout: 10
+  snifferTimeout: 10,
+  apiTimeout: 30
 })
 
 const addressSaving = reactive({
@@ -907,7 +964,8 @@ const addressSaving = reactive({
   proxyPlayReset: false,
   proxySniff: false,
   proxySniffReset: false,
-  snifferTimeout: false
+  snifferTimeout: false,
+  apiTimeout: false
 })
 
 const addressTesting = reactive({
@@ -920,7 +978,8 @@ const addressStatus = reactive({
   proxyAccess: null,
   proxyPlay: null,
   proxySniff: null,
-  snifferTimeout: null
+  snifferTimeout: null,
+  apiTimeout: null
 })
 
 // 播放器类型选项
@@ -1464,6 +1523,10 @@ const loadConfig = async () => {
         // 确保嗅探超时有默认值
         if (!addressSettings.snifferTimeout) {
           addressSettings.snifferTimeout = 10
+        }
+        // 确保访问超时有默认值
+        if (!addressSettings.apiTimeout) {
+          addressSettings.apiTimeout = 30
         }
       } catch (error) {
         console.error('Failed to load address settings:', error)
