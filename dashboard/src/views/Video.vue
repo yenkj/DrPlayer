@@ -7,7 +7,9 @@
     @closeWindow="closeWindow"
     @onSearch="onSearch"
     @handlePush="handlePush"
+    @actionExecuted="handleActionExecuted"
     :now_site_title="form.now_site_title"
+    :sites="form.sites"
   >
     <!-- 默认插槽的内容放这里 -->
     <div class="current-time">
@@ -868,6 +870,30 @@ const handlePush = async (vodId) => {
   } catch (error) {
     console.error("推送失败:", error);
     Message.error("推送失败，请重试");
+  }
+};
+
+// 处理全局动作执行完成事件
+const handleActionExecuted = (event) => {
+  console.log('全局动作执行完成:', event);
+  
+  if (event.success) {
+    // 动作执行成功，可以根据需要进行后续处理
+    console.log('动作执行成功:', event.action.name, event.result);
+    
+    // 如果动作返回了特殊结果，可以在这里处理
+    if (event.result && event.result.refresh) {
+      // 如果动作要求刷新页面
+      refreshPage();
+    }
+    
+    if (event.result && event.result.navigate) {
+      // 如果动作要求导航到其他页面
+      router.push(event.result.navigate);
+    }
+  } else {
+    // 动作执行失败
+    console.error('动作执行失败:', event.action.name, event.error);
   }
 };
 
