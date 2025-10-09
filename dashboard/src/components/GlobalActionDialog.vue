@@ -93,6 +93,22 @@
         </div>
       </div>
     </div>
+
+    <!-- ActionRenderer组件 -->
+    <ActionRenderer
+      v-if="showActionRenderer"
+      ref="actionRendererRef"
+      :action-data="currentActionData"
+      :module="currentActionData?.siteKey"
+      :extend="currentActionData?.siteExt"
+      :api-url="currentActionData?.siteApi"
+      :visible="showActionRenderer"
+      @close="handleActionRendererClose"
+      @action="handleActionRendererAction"
+      @success="handleActionRendererSuccess"
+      @error="handleActionRendererError"
+      @special-action="handleSpecialAction"
+    />
   </a-modal>
 </template>
 
@@ -100,6 +116,7 @@
 import { ref, computed, watch } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import { Actions } from '@/components/actions'
+import ActionRenderer from '@/components/actions/ActionRenderer.vue'
 
 const props = defineProps({
   visible: {
@@ -112,10 +129,15 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:visible', 'action-executed'])
+const emit = defineEmits(['update:visible', 'action-executed', 'special-action'])
 
 const searchKeyword = ref('')
 const selectedSiteKey = ref('')
+
+// ActionRenderer 相关状态
+const showActionRenderer = ref(false)
+const currentActionData = ref(null)
+const actionRendererRef = ref(null)
 
 // 计算所有可用的动作
 const allActions = computed(() => {
@@ -260,50 +282,11 @@ const handleActionClick = async (action) => {
     actionConfig.siteApi = action.siteApi
     actionConfig.siteExt = action.siteExt
 
-    // 根据动作类型执行相应的操作
-    let result
-    switch (actionConfig.type) {
-      case 'input':
-        result = await Actions.input(actionConfig)
-        break
-      case 'multiInput':
-        result = await Actions.multiInput(actionConfig)
-        break
-      case 'multiInputX':
-        result = await Actions.multiInputX(actionConfig)
-        break
-      case 'menu':
-        result = await Actions.menu(actionConfig)
-        break
-      case 'select':
-        result = await Actions.select(actionConfig)
-        break
-      case 'msgbox':
-        result = await Actions.msgBox(actionConfig)
-        break
-      case 'webview':
-        result = await Actions.webView(actionConfig)
-        break
-      case 'help':
-        result = await Actions.help(actionConfig)
-        break
-      default:
-        // 对于未知类型，显示错误信息
-        result = await Actions.error(`不支持的动作类型: ${actionConfig.type}`)
-        break
-    }
+    console.log('<actionConfig>:', actionConfig)
 
-    // 发送动作执行完成事件
-    emit('action-executed', {
-      action,
-      result,
-      success: true
-    })
-
-    Message.success(`动作 "${action.name}" 执行成功`)
-    
-    // 关闭弹窗
-    handleCancel()
+    // 使用 ActionRenderer 组件显示动作交互界面
+    currentActionData.value = actionConfig
+    showActionRenderer.value = true
 
   } catch (error) {
     console.error('执行全局动作失败:', error)
@@ -315,9 +298,7 @@ const handleActionClick = async (action) => {
       success: false
     })
 
-    if (error.type !== 'cancel') {
-      Message.error(`动作 "${action.name}" 执行失败: ${error.message}`)
-    }
+    Message.error(`动作 "${action.name}" 执行失败: ${error.message}`)
   }
 }
 
@@ -326,6 +307,65 @@ const handleCancel = () => {
   emit('update:visible', false)
   searchKeyword.value = ''
   selectedSiteKey.value = ''
+}
+
+// ActionRenderer 事件处理函数
+const handleActionRendererClose = () => {
+  showActionRenderer.value = false
+  currentActionData.value = null
+}
+
+const handleActionRendererAction = async (actionId, value) => {
+  console.log('ActionRenderer 动作执行:', { actionId, value })
+  // 这里可以添加自定义的动作处理逻辑
+  return { success: true, message: '动作执行成功' }
+}
+
+const handleActionRendererSuccess = (value) => {
+  console.log('ActionRenderer 执行成功:', value)
+  
+  // 发送动作执行完成事件
+  emit('action-executed', {
+    action: currentActionData.value,
+    result: value,
+    success: true
+  })
+
+  Message.success(`动作执行成功`)
+  
+  // 关闭 ActionRenderer
+  handleActionRendererClose()
+  
+  // 关闭全局动作弹窗
+  handleCancel()
+}
+
+const handleActionRendererError = (error) => {
+  console.error('ActionRenderer 执行失败:', error)
+  
+  // 发送动作执行失败事件
+  emit('action-executed', {
+    action: currentActionData.value,
+    error: error.message || error,
+    success: false
+  })
+
+  if (error.type !== 'cancel') {
+    Message.error(`动作执行失败: ${error.message || error}`)
+  }
+  
+  // 关闭 ActionRenderer
+  handleActionRendererClose()
+}
+
+const handleSpecialAction = (actionType, actionData) => {
+  console.log('ActionRenderer special-action:', { actionType, actionData })
+  
+  // 发送特殊动作事件给父组件处理
+  emit('special-action', actionType, actionData)
+  
+  // 关闭 ActionRenderer
+  handleActionRendererClose()
 }
 
 // 监听弹窗显示状态，重置搜索和筛选
