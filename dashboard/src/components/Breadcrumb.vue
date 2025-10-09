@@ -184,11 +184,19 @@ const handleActionExecuted = (event) => {
   // 向父组件发送动作执行事件
   emit('actionExecuted', event);
   
+  // 添加安全检查，防止null引用错误
+  if (!event || typeof event !== 'object') {
+    console.warn('Invalid event object received in handleActionExecuted');
+    return;
+  }
+  
+  const actionName = event.action?.name || '未知动作';
+  
   if (event.success) {
-    Message.success(`动作 "${event.action.name}" 执行成功`);
+    Message.success(`动作 "${actionName}" 执行成功`);
   } else {
     if (event.error !== 'cancel') {
-      Message.error(`动作 "${event.action.name}" 执行失败: ${event.error}`);
+      Message.error(`动作 "${actionName}" 执行失败: ${event.error || '未知错误'}`);
     }
   }
 };

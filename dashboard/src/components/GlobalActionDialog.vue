@@ -228,6 +228,11 @@ const handleActionClick = async (action) => {
   try {
     console.log('执行全局动作:', action)
     
+    // 添加安全检查，防止null引用错误
+    if (!action || typeof action !== 'object') {
+      throw new Error('无效的动作对象')
+    }
+    
     // 解析动作配置
     let actionConfig
     if (typeof action.action === 'string') {
@@ -239,11 +244,11 @@ const handleActionClick = async (action) => {
         actionConfig = {
           actionId: action.action,
           type: 'msgbox',
-          title: action.name,
+          title: action.name || '未知动作',
           msg: `执行动作: ${action.action}`
         }
       }
-    } else if (typeof action.action === 'object') {
+    } else if (typeof action.action === 'object' && action.action !== null) {
       actionConfig = action.action
     } else {
       throw new Error('无效的动作配置')

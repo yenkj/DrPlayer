@@ -247,9 +247,11 @@ const checkNowSite = () => {
     } else if (form.sites.length > 0) {
       // 如果没有当前源，设置第一个可用源
       const firstSite = form.sites.find(site => site.type === 4) || form.sites[0];
-      form.now_site = firstSite;
-      form.now_site_title = firstSite.name;
-      siteService.setCurrentSite(firstSite.key);
+      if (firstSite) {
+        form.now_site = firstSite;
+        form.now_site_title = firstSite.name;
+        siteService.setCurrentSite(firstSite.key);
+      }
     }
   } else {
     // 检查当前源是否在站点列表中
@@ -257,9 +259,11 @@ const checkNowSite = () => {
     if (!siteExists && form.sites.length > 0) {
       // 如果当前源不在列表中，设置第一个可用源
       const firstSite = form.sites.find(site => site.type === 4) || form.sites[0];
-      form.now_site = firstSite;
-      form.now_site_title = firstSite.name;
-      siteService.setCurrentSite(firstSite.key);
+      if (firstSite) {
+        form.now_site = firstSite;
+        form.now_site_title = firstSite.name;
+        siteService.setCurrentSite(firstSite.key);
+      }
     }
   }
   
@@ -877,9 +881,17 @@ const handlePush = async (vodId) => {
 const handleActionExecuted = (event) => {
   console.log('全局动作执行完成:', event);
   
+  // 添加安全检查，防止null引用错误
+  if (!event || typeof event !== 'object') {
+    console.warn('Invalid event object received in handleActionExecuted');
+    return;
+  }
+  
+  const actionName = event.action?.name || '未知动作';
+  
   if (event.success) {
     // 动作执行成功，可以根据需要进行后续处理
-    console.log('动作执行成功:', event.action.name, event.result);
+    console.log('动作执行成功:', actionName, event.result);
     
     // 如果动作返回了特殊结果，可以在这里处理
     if (event.result && event.result.refresh) {
@@ -893,7 +905,7 @@ const handleActionExecuted = (event) => {
     }
   } else {
     // 动作执行失败
-    console.error('动作执行失败:', event.action.name, event.error);
+    console.error('动作执行失败:', actionName, event.error);
   }
 };
 
