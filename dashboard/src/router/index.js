@@ -12,6 +12,7 @@ import ActionTest from '@/views/ActionTest.vue';
 import ActionDebugTest from '@/views/ActionDebugTest.vue';
 import VideoTest from '@/views/VideoTest.vue';
 import CSPTest from '@/views/CSPTest.vue';
+import SearchAggregation from '@/views/SearchAggregation.vue';
 
 
 const routes = [
@@ -28,6 +29,7 @@ const routes = [
     {path: '/action-debug-test', component: ActionDebugTest, name: 'ActionDebugTest'},
     {path: '/video-test', component: VideoTest, name: 'VideoTest'},
     {path: '/csp-test', component: CSPTest, name: 'CSPTest'},
+    {path: '/search', component: SearchAggregation, name: 'SearchAggregation'},
 
     // 404 fallback路由 - 必须放在最后
     {path: '/:pathMatch(.*)*', redirect: '/'}
