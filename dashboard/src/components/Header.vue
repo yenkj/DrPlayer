@@ -38,9 +38,12 @@
             v-model="searchValue"
             placeholder="搜索内容..."
             enter-button="搜索"
+            allow-clear
             @search="onSearch"
+            @keyup.enter="onSearch(searchValue)"
             @click="handleSearchClick"
             @input="handleSearchInput"
+            @clear="handleSearchClear"
         />
         <a-button 
             class="search-settings-btn" 
@@ -183,7 +186,13 @@ export default defineComponent({
     },
     goBackFromSearch() {
       // 从聚合搜索页面返回到上一页
-      this.$router.go(-1);
+      // 检查是否有历史记录可以返回
+      if (window.history.length > 1) {
+        this.$router.back();
+      } else {
+        // 如果没有历史记录，返回到首页
+        this.$router.push({ name: 'Home' });
+      }
     },
     goForward() {
       Message.info("后退按钮");
@@ -222,8 +231,19 @@ export default defineComponent({
       }
     },
     handleSearchInput(value) {
-      // 搜索输入时的处理（可以用于实时搜索建议等）
-      // 暂时不做特殊处理
+      // 搜索输入时的处理：在聚合搜索页写入草稿以生成建议
+      if (this.isSearchAggregationPage) {
+        const query = { ...this.$route.query, keywordDraft: value };
+        this.$router.push({ name: 'SearchAggregation', query });
+      }
+    },
+    handleSearchClear() {
+      // 清除输入内容，同时清空聚搜页的草稿
+      if (this.isSearchAggregationPage) {
+        const query = { ...this.$route.query };
+        delete query.keywordDraft;
+        this.$router.push({ name: 'SearchAggregation', query });
+      }
     },
     openSearchSettings() {
       // 打开搜索设置弹窗

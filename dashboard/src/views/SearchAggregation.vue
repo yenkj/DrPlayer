@@ -4,8 +4,54 @@
 
     <!-- 主要内容区域 -->
     <div class="search-content">
-      <!-- 搜索前的状态：热门搜索 -->
-      <div v-if="!hasSearched && !searchKeyword" class="search-home">
+      <!-- 最近搜索记录（仅在搜索前显示，有记录时） -->
+      <div v-if="!hasSearched && recentSearches.length > 0" class="recent-search-floating">
+        <div class="recent-search-section">
+          <div class="section-header">
+            <h3 class="section-title">
+              <icon-history class="title-icon"/>
+              最近搜索记录
+            </h3>
+            <a-button type="text" size="small" class="refresh-btn" @click="clearRecentSearches">清空</a-button>
+          </div>
+          <div class="recent-search-tags">
+            <a-tag 
+                v-for="tag in recentSearches" 
+                :key="tag"
+                class="recent-tag"
+                @click="performSearch(tag)"
+            >
+              {{ tag }}
+            </a-tag>
+          </div>
+        </div>
+      </div>
+
+      <!-- 搜索前的状态：建议+热门 -->
+      <div v-if="!hasSearched" class="search-home">
+        <!-- 猜你想搜（有输入草稿时显示） -->
+        <div v-if="suggestions.length > 0" class="search-suggestions">
+          <div class="section-header">
+            <h3 class="section-title">
+              <icon-bulb class="title-icon"/>
+              猜你想搜
+            </h3>
+          </div>
+          <div class="suggestions-tags">
+              <a-tag 
+                  v-for="suggestion in suggestions" 
+                  :key="suggestion"
+                  class="suggestion-tag"
+                  @click="searchSuggestion(suggestion)"
+              >
+                {{ suggestion }}
+              </a-tag>
+          </div>
+        </div>
+
+
+
+        <!-- 热门搜索 -->
         <div class="hot-search-section">
           <div class="section-header">
             <h3 class="section-title">
@@ -33,27 +79,6 @@
             >
               {{ tag }}
             </a-tag>
-          </div>
-        </div>
-      </div>
-
-      <!-- 搜索输入时的状态：猜你喜欢 -->
-      <div v-if="!hasSearched && searchKeyword && searchKeyword.trim()" class="search-suggestions">
-        <div class="suggestions-section">
-          <h3 class="section-title">
-            <icon-heart class="title-icon"/>
-            猜你喜欢
-          </h3>
-          <div class="suggestions-list">
-            <div 
-                v-for="suggestion in suggestions" 
-                :key="suggestion"
-                class="suggestion-item"
-                @click="searchSuggestion(suggestion)"
-            >
-              <icon-search class="suggestion-icon"/>
-              <span class="suggestion-text">{{ suggestion }}</span>
-            </div>
           </div>
         </div>
       </div>
@@ -152,7 +177,7 @@
             
             <!-- 加载状态 -->
             <div v-else-if="activeSource && loadingStates[activeSource]" class="loading-state">
-              <a-spin size="large"/>
+              <a-spin :size="32"/>
               <p>正在搜索 {{ getSourceName(activeSource) }}...</p>
             </div>
             
@@ -185,6 +210,16 @@
 import { defineComponent, ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Message } from '@arco-design/web-vue';
+import { 
+  IconHistory, 
+  IconBulb, 
+  IconFire, 
+  IconRefresh, 
+  IconCheckCircle, 
+  IconCloseCircle, 
+  IconExclamationCircle, 
+  IconEmpty 
+} from '@arco-design/web-vue/es/icon';
 import SearchSettingsModal from '@/components/SearchSettingsModal.vue';
 import siteService from '@/api/services/site';
 import videoService from '@/api/services/video';
@@ -192,7 +227,15 @@ import videoService from '@/api/services/video';
 export default defineComponent({
   name: 'SearchAggregation',
   components: {
-    SearchSettingsModal
+    SearchSettingsModal,
+    IconHistory,
+    IconBulb,
+    IconFire,
+    IconRefresh,
+    IconCheckCircle,
+    IconCloseCircle,
+    IconExclamationCircle,
+    IconEmpty
   },
   setup() {
     const route = useRoute();
@@ -202,6 +245,7 @@ export default defineComponent({
     const searchKeyword = ref('');
     const hasSearched = ref(false);
     const showSearchSettings = ref(false);
+    const recentSearches = ref([]);
     
     // 搜索源和结果
     const searchSources = ref([]);
@@ -323,6 +367,29 @@ export default defineComponent({
       );
       
       await Promise.allSettled(searchPromises);
+      // 记录最近搜索
+      try {
+        const HISTORY_KEY = 'drplayer_search_history';
+        const stored = localStorage.getItem(HISTORY_KEY);
+        let history = [];
+        try { history = stored ? JSON.parse(stored) : []; } catch { history = []; }
+        const k = searchKeyword.value;
+        // 过滤空字符串和无效值
+        if (k && k.trim()) {
+          const idx = history.findIndex(item => item === k);
+          if (idx !== -1) history.splice(idx, 1);
+          history.unshift(k);
+          // 过滤历史记录中的空字符串
+          history = history.filter(item => item && item.trim());
+          if (history.length > 10) history = history.slice(0, 10);
+          localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+          // console.log('保存搜索历史记录:',history);
+          // 直接更新最近搜索记录
+          recentSearches.value = [...history];
+        }
+      } catch (e) {
+        console.error('保存搜索历史失败:', e);
+      }
     };
     
     const searchSource = async (source, keyword) => {
@@ -485,6 +552,29 @@ export default defineComponent({
       hotSearchTags.value = shuffled.slice(0, 12); // 显示12个标签
     };
     
+    // 最近搜索读取与清空
+    const loadRecentSearches = () => {
+      try {
+        const HISTORY_KEY = 'drplayer_search_history';
+        const stored = localStorage.getItem(HISTORY_KEY);
+        let history = stored ? JSON.parse(stored) : [];
+        if (!Array.isArray(history)) history = [];
+        // 过滤空字符串和无效值
+        recentSearches.value = history.filter(item => item && item.trim());
+        // 如果过滤后的数据与原数据不同，更新localStorage
+        if (recentSearches.value.length !== history.length) {
+          localStorage.setItem(HISTORY_KEY, JSON.stringify(recentSearches.value));
+        }
+      } catch {
+        recentSearches.value = [];
+      }
+    };
+    const clearRecentSearches = () => {
+      localStorage.removeItem('drplayer_search_history');
+      recentSearches.value = [];
+      Message.success('已清空最近搜索记录');
+    };
+    
     // 监听路由参数
     watch(() => route.query.keyword, (keyword) => {
       if (keyword) {
@@ -492,11 +582,21 @@ export default defineComponent({
         performSearch(keyword);
       }
     }, { immediate: true });
+    // 监听输入草稿用于生成建议
+    watch(() => route.query.keywordDraft, (draft) => {
+      const val = typeof draft === 'string' ? draft : '';
+      // 只有在没有进行搜索时才更新searchKeyword.value，避免在搜索过程中被重置
+      if (!hasSearched.value) {
+        searchKeyword.value = val;
+      }
+      onSearchInput(val);
+    });
     
     // 组件挂载时初始化
     onMounted(() => {
       loadSearchSources();
       randomizeHotSearchTags();
+      loadRecentSearches();
       
       // 显示当前配置状态
       const settings = getSearchSettings();
@@ -532,7 +632,10 @@ export default defineComponent({
       handleImageError,
       onPageChange,
       onPageSizeChange,
-      randomizeHotSearchTags
+      randomizeHotSearchTags,
+      // 最近搜索
+      recentSearches,
+      clearRecentSearches
     };
   }
 });
@@ -562,7 +665,32 @@ export default defineComponent({
 }
 
 .hot-search-section {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
   margin-bottom: 40px;
+  margin-top: 0;
+}
+
+.recent-search-section {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto 20px auto;
+}
+.recent-search-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.recent-tag {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 16px;
+  padding: 6px 16px;
+}
+.recent-tag:hover {
+  background: var(--color-fill-2);
+  transform: translateY(-1px);
 }
 
 .section-header {
@@ -616,43 +744,40 @@ export default defineComponent({
   transform: translateY(-1px);
 }
 
+/* 最近搜索记录浮动区域 */
+.recent-search-floating {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+  margin-bottom: 8px;
+}
+
 /* 搜索建议样式 */
 .search-suggestions {
   padding: 20px;
   max-width: 800px;
   margin: 0 auto;
+  margin-bottom: 8px;
 }
 
-.suggestions-list {
+.suggestions-tags {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.suggestion-item {
-  display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
-  padding: 12px 16px;
-  border-radius: 8px;
+}
+
+.suggestion-tag {
   cursor: pointer;
   transition: all 0.2s ease;
-  background: var(--color-bg-2);
+  border-radius: 16px;
+  padding: 6px 16px;
 }
 
-.suggestion-item:hover {
-  background: var(--color-fill-2);
-  transform: translateX(4px);
-}
-
-.suggestion-icon {
-  color: var(--color-text-3);
-  font-size: 14px;
-}
-
-.suggestion-text {
-  color: var(--color-text-1);
-  font-size: 14px;
+.suggestion-tag:hover {
+  background: var(--color-primary-1);
+  border-color: var(--color-primary-6);
+  color: var(--color-primary-6);
+  transform: translateY(-1px);
 }
 
 /* 搜索结果样式 */
