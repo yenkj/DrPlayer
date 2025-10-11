@@ -164,20 +164,20 @@
                   </div>
                 </div>
               </div>
-              
-              <!-- 分页 -->
-              <div v-if="totalPages > 1" class="pagination-container">
-                <a-pagination
-                    v-model:current="currentPage"
-                    :total="searchResults[activeSource].length"
-                    :page-size="pageSize"
-                    :show-total="true"
-                    :show-jumper="true"
-                    :show-size-changer="true"
-                    @change="onPageChange"
-                    @page-size-change="onPageSizeChange"
-                />
-              </div>
+            </div>
+            
+            <!-- 分页 -->
+            <div v-if="activeSource && searchResults[activeSource] && totalPages > 1" class="pagination-container">
+              <a-pagination
+                  v-model:current="currentPage"
+                  :total="searchResults[activeSource].length"
+                  :page-size="pageSize"
+                  :show-total="true"
+                  :show-jumper="true"
+                  :show-size-changer="true"
+                  @change="onPageChange"
+                  @page-size-change="onPageSizeChange"
+              />
             </div>
             
             <!-- 加载状态 -->
@@ -808,7 +808,7 @@ export default defineComponent({
 
 /* 搜索结果样式 */
 .search-results {
-  height: 100%;
+  height: calc(100vh - 112px); /* 减去顶部导航(64px)和底部(48px)的高度 */
   overflow: hidden;
 }
 
@@ -824,6 +824,7 @@ export default defineComponent({
   border-right: 1px solid var(--color-border-2);
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .sources-header {
@@ -832,6 +833,11 @@ export default defineComponent({
   gap: 8px;
   padding: 16px 20px;
   border-bottom: 1px solid var(--color-border-2);
+  background: var(--color-bg-2);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-shrink: 0;
 }
 
 .sources-header h4 {
@@ -850,6 +856,7 @@ export default defineComponent({
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+  height: 0; /* 强制flex子元素计算高度 */
 }
 
 .source-item {
@@ -910,13 +917,13 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 100%;
 }
 
 .results-list {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  height: 100%;
 }
 
 .results-header {
@@ -925,6 +932,11 @@ export default defineComponent({
   justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid var(--color-border-2);
+  background: var(--color-bg-1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-shrink: 0;
 }
 
 .results-header h4 {
@@ -946,6 +958,7 @@ export default defineComponent({
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 20px;
+  height: 0; /* 强制flex子元素计算高度 */
 }
 
 .video-card {
@@ -1040,6 +1053,8 @@ export default defineComponent({
   border-top: 1px solid var(--color-border-2);
   display: flex;
   justify-content: center;
+  background: var(--color-bg-1);
+  flex-shrink: 0;
 }
 
 /* 状态样式 */

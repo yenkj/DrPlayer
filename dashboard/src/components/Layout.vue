@@ -57,7 +57,7 @@
 
       <!-- 主内容区域 -->
       <div class="main-content" :class="{ 'sider-collapsed': siderCollapsed }">
-        <div class="content-wrapper">
+        <div class="content-wrapper" :class="{ 'search-page': isSearchPage }">
           <slot></slot> <!-- 插槽，用于插入页面内容 -->
         </div>
         
@@ -71,7 +71,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, watch } from 'vue';
+import { defineComponent, ref, watch, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { Message } from '@arco-design/web-vue';
 import {
@@ -98,6 +98,11 @@ export default defineComponent({
   setup() {
     const route = useRoute();
     const paginationStore = usePaginationStore();
+    
+    // 检测是否为搜索页面
+    const isSearchPage = computed(() => {
+      return route.path === '/search' || route.name === 'SearchAggregation';
+    });
     
     const siderCollapsed = ref(false);
     const menuItems = ref([
@@ -137,7 +142,8 @@ export default defineComponent({
       logoSrc,
       logoDesc,
       onClickMenuItem,
-      onSiderCollapse
+      onSiderCollapse,
+      isSearchPage
     };
   }
 });
@@ -209,6 +215,12 @@ export default defineComponent({
   overflow-x: hidden;
   padding: 0 24px 16px 24px; /* 上右下左：减少下padding */
   background: var(--color-bg-3);
+}
+
+/* 搜索页面的内容包装器 - 移除滚动，让内部组件自己控制 */
+.content-wrapper.search-page {
+  overflow: hidden;
+  padding: 0; /* 移除padding，让搜索页面完全控制布局 */
 }
 
 /* 固定的底部 */
