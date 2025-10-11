@@ -290,16 +290,8 @@ export default defineComponent({
       // 重置为默认配置（选择所有可用源）
       selectedSources.value = availableSources.value.map(source => source.key);
       updateSelectAllState();
-      
-      // 清除localStorage中的配置
-      try {
-        localStorage.removeItem('searchAggregationSettings');
-        console.log('已重置搜索源配置');
-        Message.success('已重置为默认配置');
-      } catch (error) {
-        console.error('重置配置失败:', error);
-        Message.error('重置配置失败');
-      }
+      // 不进行持久化，需点击“确定”才保存
+      Message.info('已恢复默认选择，点击“确定”后保存');
     };
     
     const onSearchFilterChange = () => {
