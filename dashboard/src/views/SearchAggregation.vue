@@ -12,14 +12,19 @@
               <icon-history class="title-icon"/>
               最近搜索记录
             </h3>
-            <a-button type="text" size="small" class="refresh-btn" @click="clearRecentSearches">清空</a-button>
+            <a-button type="text" size="small" class="refresh-btn" @click="clearRecentSearches">
+              <template #icon>
+                <icon-delete/>
+              </template>
+              清空
+            </a-button>
           </div>
           <div class="recent-search-tags">
             <a-tag 
                 v-for="tag in recentSearches" 
                 :key="tag"
                 class="recent-tag"
-                @click="performSearch(tag)"
+                @click="searchRecentTag(tag)"
             >
               {{ tag }}
             </a-tag>
@@ -218,7 +223,8 @@ import {
   IconCheckCircle, 
   IconCloseCircle, 
   IconExclamationCircle, 
-  IconEmpty 
+  IconEmpty,
+  IconDelete 
 } from '@arco-design/web-vue/es/icon';
 import SearchSettingsModal from '@/components/SearchSettingsModal.vue';
 import siteService from '@/api/services/site';
@@ -235,7 +241,8 @@ export default defineComponent({
     IconCheckCircle,
     IconCloseCircle,
     IconExclamationCircle,
-    IconEmpty
+    IconEmpty,
+    IconDelete
   },
   setup() {
     const route = useRoute();
@@ -497,13 +504,24 @@ export default defineComponent({
     };
     
     const searchHotTag = (tag) => {
-      searchKeyword.value = tag;
-      performSearch(tag);
+      router.push({
+        name: 'SearchAggregation',
+        query: { keyword: tag }
+      });
     };
     
     const searchSuggestion = (suggestion) => {
-      searchKeyword.value = suggestion;
-      performSearch(suggestion);
+      router.push({
+        name: 'SearchAggregation',
+        query: { keyword: suggestion }
+      });
+    };
+    
+    const searchRecentTag = (tag) => {
+      router.push({
+        name: 'SearchAggregation',
+        query: { keyword: tag }
+      });
     };
     
     const onSearchSettingsConfirm = (settings) => {
@@ -580,6 +598,13 @@ export default defineComponent({
       if (keyword) {
         searchKeyword.value = keyword;
         performSearch(keyword);
+      } else {
+        // 当没有keyword参数时，重置搜索状态
+        hasSearched.value = false;
+        searchKeyword.value = '';
+        searchResults.value = {};
+        activeSource.value = '';
+        currentPage.value = 1;
       }
     }, { immediate: true });
     // 监听输入草稿用于生成建议
@@ -627,6 +652,7 @@ export default defineComponent({
       onSearchInput,
       searchHotTag,
       searchSuggestion,
+      searchRecentTag,
       onSearchSettingsConfirm,
       playVideo,
       handleImageError,

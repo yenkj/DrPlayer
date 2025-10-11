@@ -55,6 +55,17 @@
             <icon-settings/>
           </template>
         </a-button>
+        <a-button 
+            v-if="hasSearchResults"
+            class="close-search-btn" 
+            shape="circle" 
+            @click="closeSearchResults"
+            :title="'关闭搜索结果'"
+        >
+          <template #icon>
+            <icon-close/>
+          </template>
+        </a-button>
       </div>
     </div>
 
@@ -128,6 +139,11 @@ export default defineComponent({
       return route.name === 'SearchAggregation';
     });
     
+    // 检测是否有搜索结果（当在搜索页面且有搜索关键词时）
+    const hasSearchResults = computed(() => {
+      return isSearchAggregationPage.value && route.query.keyword;
+    });
+    
     // 从localStorage获取聚搜功能状态
     const getSearchAggregationStatus = () => {
       try {
@@ -176,6 +192,7 @@ export default defineComponent({
       searchValue,
       showSearchSettings: ref(false),
       isSearchAggregationPage,
+      hasSearchResults,
       router
     };
   },
@@ -254,6 +271,11 @@ export default defineComponent({
       const selectedCount = settings.selectedSources ? settings.selectedSources.length : 0;
       Message.success(`已选择 ${selectedCount} 个搜索源`);
       this.showSearchSettings = false;
+    },
+    closeSearchResults() {
+      // 关闭搜索结果，回到搜索页面的初始状态
+      this.searchValue = '';
+      this.$router.push({ name: 'SearchAggregation' });
     },
     minimize() {
       Message.info("最小化窗口");
@@ -484,6 +506,31 @@ export default defineComponent({
 .search-settings-btn:active {
   transform: translateY(0) !important;
   background: var(--color-fill-4) !important;
+}
+
+/* 关闭搜索按钮样式 */
+.close-search-btn {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--color-border-2) !important;
+  background: var(--color-bg-2) !important;
+  color: var(--color-text-2) !important;
+  transition: all 0.2s ease !important;
+  flex-shrink: 0;
+}
+
+.close-search-btn:hover {
+  background: var(--color-danger-light-1) !important;
+  border-color: var(--color-danger-light-3) !important;
+  color: var(--color-danger-6) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(245, 63, 63, 0.15) !important;
+}
+
+.close-search-btn:active {
+  transform: translateY(0) !important;
+  background: var(--color-danger-light-2) !important;
 }
 
 .search-container :deep(.arco-input-search:focus-within) {
