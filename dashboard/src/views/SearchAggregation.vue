@@ -135,50 +135,92 @@
                   共 {{ searchResults[activeSource].length }} 条结果
                 </span>
               </div>
-              <div class="video-grid">
-                <div 
-                    v-for="(video, index) in paginatedResults" 
-                    :key="index"
-                    class="video-card"
-                    @click="playVideo(video)"
+              <a-scrollbar
+                ref="scrollbarRef"
+                @scroll="handleScroll"
+                class="search-scroll-container"
+                :style="'height:' + scrollAreaHeight + 'px; overflow: auto;'"
+              >
+                <!-- 搜索结果网格 -->
+                <a-grid 
+                  v-if="searchResults[activeSource] && searchResults[activeSource].length > 0"
+                  :cols="{ xs: 2, sm: 3, md: 4, lg: 5, xl: 6, xxl: 8 }" 
+                  :rowGap="16" 
+                  :colGap="12"
+                  class="video-grid"
                 >
-                  <div class="video-poster">
-                    <img 
-                        v-if="video.pic" 
-                        :src="video.pic" 
-                        :alt="video.name"
-                        @error="handleImageError"
-                    />
-                    <div v-else class="poster-placeholder">
-                      <icon-play-arrow class="play-icon"/>
+                  <a-grid-item 
+                    v-for="(video, index) in displayedResults" 
+                    :key="video.vod_id || index"
+                    class="video-card-item"
+                  >
+                    <div class="video-card" @click="handleVideoClick(video)">
+                      <div class="video-poster">
+                        <!-- 优先显示vod_pic图片，如果有值的话 -->
+                        <img
+                          v-if="video.vod_pic && video.vod_pic.trim() !== ''"
+                          class="video-poster-img"
+                          :src="video.vod_pic"
+                          :alt="video.vod_name"
+                          @error="handleImageError"
+                        />
+                        <!-- 文件夹图标 (当vod_pic为空且是文件夹时) -->
+                        <div v-else-if="isFolder(video)" class="folder-icon-container">
+                          <i class="iconfont icon-wenjianjia folder-icon"></i>
+                        </div>
+                        <!-- 文件类型图标 (当vod_pic为空且是目录模式下的非文件夹项目时) -->
+                        <div v-else-if="isDirectoryFile(video)" class="file-icon-container">
+                          <svg style="width:30%">
+                            <use :href="`#${getFileTypeIcon(video.vod_name)}`"></use>
+                          </svg>
+                        </div>
+                        <!-- 默认图片 (当vod_pic为空且没有特殊标识时) -->
+                        <img
+                          v-else
+                          class="video-poster-img"
+                          :src="video.vod_pic || '/default-poster.svg'"
+                          :alt="video.vod_name"
+                          @error="handleImageError"
+                        />
+                        <!-- Action标识 -->
+                        <div v-if="video.vod_tag === 'action'" class="action-badge">
+                          <icon-thunderbolt />
+                        </div>
+                        <!-- 播放按钮覆盖层 -->
+                        <div class="play-overlay">
+                          <icon-play-arrow-fill />
+                        </div>
+                        <!-- vod_remarks 浮层 -->
+                        <div v-if="video.vod_remarks" class="video-remarks-overlay" v-html="video.vod_remarks">
+                        </div>
+                      </div>
+                      <div class="video-info">
+                        <h3 class="video-title" :title="video.vod_name">{{ video.vod_name }}</h3>
+                        <div class="video-meta">
+                          <span v-if="video.vod_year" class="video-year">{{ video.vod_year }}</span>
+                          <span v-if="video.vod_area" class="video-area">{{ video.vod_area }}</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div class="video-info">
-                    <h5 class="video-title" :title="video.name">{{ video.name }}</h5>
-                    <p class="video-desc" v-if="video.note">{{ video.note }}</p>
-                    <div class="video-meta">
-                      <span v-if="video.year" class="meta-item">{{ video.year }}</span>
-                      <span v-if="video.area" class="meta-item">{{ video.area }}</span>
-                      <span v-if="video.lang" class="meta-item">{{ video.lang }}</span>
-                    </div>
-                  </div>
+                  </a-grid-item>
+                </a-grid>
+
+                <!-- 加载更多 -->
+                <div v-if="loadingMore" class="loading-container">
+                  <a-spin />
+                  <div class="loading-text">加载更多...</div>
                 </div>
-              </div>
+                
+                <!-- 没有更多数据提示 -->
+                <div v-else-if="!hasMoreData && searchResults[activeSource] && searchResults[activeSource].length > 0" class="no-more-data">
+                  没有更多数据了
+                </div>
+
+                <!-- 底部间距 -->
+                <div class="bottom-spacer"></div>
+              </a-scrollbar>
             </div>
-            
-            <!-- 分页 -->
-            <div v-if="activeSource && searchResults[activeSource] && totalPages > 1" class="pagination-container">
-              <a-pagination
-                  v-model:current="currentPage"
-                  :total="searchResults[activeSource].length"
-                  :page-size="pageSize"
-                  :show-total="true"
-                  :show-jumper="true"
-                  :show-size-changer="true"
-                  @change="onPageChange"
-                  @page-size-change="onPageSizeChange"
-              />
-            </div>
+
             
             <!-- 加载状态 -->
             <div v-else-if="activeSource && loadingStates[activeSource]" class="loading-state">
@@ -199,6 +241,13 @@
               <p>{{ getSourceName(activeSource) }} 暂无搜索结果</p>
             </div>
           </div>
+          
+          <!-- ActionRenderer组件 -->
+          <ActionRenderer
+            v-if="showActionRenderer"
+            :action-data="currentActionData"
+            @close="handleActionClose"
+          />
         </div>
       </div>
     </div>
@@ -212,7 +261,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, onMounted, watch } from 'vue';
+import { defineComponent, ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Message } from '@arco-design/web-vue';
 import { 
@@ -227,6 +276,11 @@ import {
   IconDelete 
 } from '@arco-design/web-vue/es/icon';
 import SearchSettingsModal from '@/components/SearchSettingsModal.vue';
+import ActionRenderer from '@/components/actions/ActionRenderer.vue';
+import { getFileTypeIcon, isFolder, isDirectoryFile } from '@/utils/fileTypeUtils';
+import { usePaginationStore } from '@/stores/paginationStore';
+import { usePageStateStore } from '@/stores/pageStateStore';
+import { useVisitedStore } from '@/stores/visitedStore';
 import siteService from '@/api/services/site';
 import videoService from '@/api/services/video';
 
@@ -234,6 +288,7 @@ export default defineComponent({
   name: 'SearchAggregation',
   components: {
     SearchSettingsModal,
+    ActionRenderer,
     IconHistory,
     IconBulb,
     IconFire,
@@ -248,6 +303,11 @@ export default defineComponent({
     const route = useRoute();
     const router = useRouter();
     
+    // Stores
+    const paginationStore = usePaginationStore();
+    const pageStateStore = usePageStateStore();
+    const visitedStore = useVisitedStore();
+    
     // 搜索相关状态
     const searchKeyword = ref('');
     const hasSearched = ref(false);
@@ -261,9 +321,20 @@ export default defineComponent({
     const errorStates = ref({});
     const activeSource = ref('');
     
-    // 分页
-    const currentPage = ref(1);
-    const pageSize = ref(20);
+    // 滚动翻页相关
+    const scrollbarRef = ref(null);
+    const scrollAreaHeight = ref(600);
+    const displayedCount = ref(20); // 当前显示的结果数量
+    const pageSize = ref(20); // 每次加载的数量
+    const loadingMore = ref(false);
+    
+    // 分页状态管理
+    const currentPages = ref({}); // 每个源的当前页码
+    const hasMorePages = ref({}); // 每个源是否还有更多页面
+    
+    // ActionRenderer相关
+    const showActionRenderer = ref(false);
+    const currentActionData = ref(null);
     
     // 所有热门搜索标签
     const allHotSearchTags = [
@@ -282,20 +353,22 @@ export default defineComponent({
     const suggestions = ref([]);
     
     // 计算属性
-    const totalPages = computed(() => {
-      if (!activeSource.value || !searchResults.value[activeSource.value]) {
-        return 0;
-      }
-      return Math.ceil(searchResults.value[activeSource.value].length / pageSize.value);
-    });
-    
-    const paginatedResults = computed(() => {
+    const displayedResults = computed(() => {
       if (!activeSource.value || !searchResults.value[activeSource.value]) {
         return [];
       }
-      const start = (currentPage.value - 1) * pageSize.value;
-      const end = start + pageSize.value;
-      return searchResults.value[activeSource.value].slice(start, end);
+      return searchResults.value[activeSource.value].slice(0, displayedCount.value);
+    });
+    
+    const hasMoreData = computed(() => {
+      if (!activeSource.value) {
+        return false;
+      }
+      // 检查是否还有更多页面可以加载，或者当前显示的数量少于已加载的数据
+      const hasMoreFromServer = hasMorePages.value[activeSource.value] || false;
+      const hasMoreFromLocal = searchResults.value[activeSource.value] && 
+        displayedCount.value < searchResults.value[activeSource.value].length;
+      return hasMoreFromServer || hasMoreFromLocal;
     });
     
     // 方法
@@ -361,7 +434,9 @@ export default defineComponent({
       searchResults.value = {};
       loadingStates.value = {};
       errorStates.value = {};
-      currentPage.value = 1;
+      currentPages.value = {};
+      hasMorePages.value = {};
+      displayedCount.value = pageSize.value;
       
       // 设置第一个源为活跃源
       if (searchSources.value.length > 0) {
@@ -399,22 +474,53 @@ export default defineComponent({
       }
     };
     
-    const searchSource = async (source, keyword) => {
+    const searchSource = async (source, keyword, page = 1) => {
       loadingStates.value[source.key] = true;
       
       try {
         const searchData = await videoService.searchVideo(source.key, {
           keyword: keyword,
-          page: 1,
+          page: page,
           extend: source.ext,
           apiUrl: source.api
         });
-        searchResults.value[source.key] = searchData.videos || [];
+        
+        const newVideos = searchData.videos || [];
+        
+        if (page === 1) {
+          // 第一页，直接设置结果
+          searchResults.value[source.key] = newVideos;
+          currentPages.value[source.key] = 1;
+        } else {
+          // 后续页面，追加到现有结果
+          if (!searchResults.value[source.key]) {
+            searchResults.value[source.key] = [];
+          }
+          
+          // 过滤重复数据
+          const existingIds = new Set(searchResults.value[source.key].map(v => v.vod_id));
+          const uniqueNewVideos = newVideos.filter(video => 
+            !existingIds.has(video.vod_id) && 
+            video.vod_id !== 'no_data' && 
+            video.vod_name !== 'no_data'
+          );
+          
+          searchResults.value[source.key] = [...searchResults.value[source.key], ...uniqueNewVideos];
+          currentPages.value[source.key] = page;
+        }
+        
+        // 更新分页状态
+        hasMorePages.value[source.key] = searchData.pagination?.hasNext !== false;
+        
         delete errorStates.value[source.key];
       } catch (error) {
         console.error(`搜索源 ${source.name} 失败:`, error);
         errorStates.value[source.key] = error.message || '搜索失败';
-        searchResults.value[source.key] = [];
+        if (page === 1) {
+          searchResults.value[source.key] = [];
+          currentPages.value[source.key] = 1;
+          hasMorePages.value[source.key] = false;
+        }
       } finally {
         loadingStates.value[source.key] = false;
       }
@@ -422,8 +528,144 @@ export default defineComponent({
     
     const selectSource = (sourceKey) => {
       activeSource.value = sourceKey;
-      currentPage.value = 1;
+      displayedCount.value = pageSize.value; // 重置显示数量
+      updateScrollAreaHeight();
+      updateGlobalStats();
     };
+    
+    // 滚动事件处理
+    const handleScroll = (e) => {
+      // 获取真正的滚动容器（arco-scrollbar内部容器）
+      const rawTarget = e?.target || e?.srcElement;
+      const container = rawTarget?.closest ? rawTarget.closest('.arco-scrollbar-container') : rawTarget;
+      if (!container) return;
+
+      const scrollHeight = container.scrollHeight - container.clientHeight;
+      const scrollTop = container.scrollTop;
+      
+      // 当滚动到距离底部50px以内时触发加载
+      if (scrollHeight - scrollTop < 50 && hasMoreData.value && !loadingMore.value) {
+        loadMore();
+      }
+    };
+    
+    // 加载更多数据
+    const loadMore = async () => {
+      if (!hasMoreData.value || loadingMore.value || !activeSource.value) return;
+      
+      loadingMore.value = true;
+      
+      try {
+        // 检查是否需要从服务器加载更多数据
+        const currentResults = searchResults.value[activeSource.value] || [];
+        const needMoreFromServer = hasMorePages.value[activeSource.value] && 
+          displayedCount.value >= currentResults.length;
+        
+        if (needMoreFromServer) {
+          // 从服务器加载下一页
+          const currentPage = currentPages.value[activeSource.value] || 1;
+          const nextPage = currentPage + 1;
+          
+          const activeSourceObj = searchSources.value.find(s => s.key === activeSource.value);
+          if (activeSourceObj && searchKeyword.value) {
+            await searchSource(activeSourceObj, searchKeyword.value, nextPage);
+          }
+        }
+        
+        // 增加显示数量
+        displayedCount.value += pageSize.value;
+        updateGlobalStats();
+      } catch (error) {
+        console.error('加载更多数据失败:', error);
+        Message.error('加载更多数据失败');
+      } finally {
+        loadingMore.value = false;
+      }
+    };
+    
+    // 动态计算滚动区域高度
+    const updateScrollAreaHeight = () => {
+      // 计算可用高度：总高度减去头部和其他固定元素
+      const availableHeight = window.innerHeight - 112; // 减去导航栏等固定高度
+      scrollAreaHeight.value = Math.max(availableHeight - 120, 400); // 减去results-header等，最小400px
+    };
+    
+    // 新的视频点击处理方法，支持action类型
+    const handleVideoClick = (video) => {
+      if (video && video.vod_id) {
+        // 检查是否为action类型
+        if (video.vod_tag === 'action') {
+          try {
+            // 尝试解析vod_id中的JSON字符串获取action配置
+            const actionConfig = JSON.parse(video.vod_id);
+            console.log('SearchAggregation解析action配置:', actionConfig);
+            
+            // 传递解析后的action配置给ActionRenderer
+            currentActionData.value = actionConfig;
+            showActionRenderer.value = true;
+            return;
+          } catch (error) {
+            console.log('SearchAggregation vod_id不是JSON格式，作为普通文本处理:', video.vod_id);
+            
+            // 如果解析失败，说明vod_id是普通文本，显示Toast提示
+            Message.info({
+              content: video.vod_id,
+              duration: 3000,
+              closable: true
+            });
+            return;
+          }
+        }
+        
+        // 记录最后点击的视频
+        visitedStore.setLastClicked(video.vod_id, video.name);
+        
+        // 跳转到视频详情页面
+        const currentSource = searchSources.value.find(s => s.key === activeSource.value);
+        if (currentSource) {
+          router.push({
+            name: 'VideoDetail',
+            params: { id: video.vod_id },
+            query: {
+              name: video.name,
+              pic: video.pic,
+              year: video.year,
+              area: video.area,
+              type: video.type,
+              remarks: video.note,
+              content: video.content,
+              actor: video.actor,
+              director: video.director,
+              site: currentSource.key,
+              api: currentSource.api,
+              ext: currentSource.ext,
+              from: 'search-aggregation',
+              // 添加来源图片信息，用于详情页图片备用
+              sourcePic: video.pic
+            }
+          });
+        }
+       }
+     };
+     
+     // 更新全局统计信息
+     const updateGlobalStats = () => {
+       if (!activeSource.value || !searchResults.value[activeSource.value]) {
+         paginationStore.updateStats(0, 0, 0);
+         return;
+       }
+       
+       const totalResults = searchResults.value[activeSource.value].length;
+       const displayedResults = Math.min(displayedCount.value, totalResults);
+       
+       paginationStore.updateStats(displayedResults, totalResults, 1);
+     };
+     
+     // ActionRenderer相关方法
+     const handleActionClose = () => {
+       showActionRenderer.value = false;
+       currentActionData.value = null;
+     };
     
     const getSourceName = (sourceKey) => {
       const source = searchSources.value.find(s => s.key === sourceKey);
@@ -555,14 +797,7 @@ export default defineComponent({
       event.target.style.display = 'none';
     };
     
-    const onPageChange = (page) => {
-      currentPage.value = page;
-    };
-    
-    const onPageSizeChange = (size) => {
-      pageSize.value = size;
-      currentPage.value = 1;
-    };
+
     
     // 随机化热门搜索标签
     const randomizeHotSearchTags = () => {
@@ -604,7 +839,7 @@ export default defineComponent({
         searchKeyword.value = '';
         searchResults.value = {};
         activeSource.value = '';
-        currentPage.value = 1;
+        displayedCount.value = pageSize.value;
       }
     }, { immediate: true });
     // 监听输入草稿用于生成建议
@@ -617,17 +852,30 @@ export default defineComponent({
       onSearchInput(val);
     });
     
+    // 监听activeSource变化，更新统计
+    watch(activeSource, () => {
+      updateGlobalStats();
+    });
+    
     // 组件挂载时初始化
     onMounted(() => {
       loadSearchSources();
       randomizeHotSearchTags();
       loadRecentSearches();
+      updateScrollAreaHeight();
+      
+      // 监听窗口大小变化
+      window.addEventListener('resize', updateScrollAreaHeight);
       
       // 显示当前配置状态
       const settings = getSearchSettings();
       if (settings.selectedSources.length > 0) {
         console.log(`已恢复搜索源配置，共 ${settings.selectedSources.length} 个源`);
       }
+    });
+    
+    onUnmounted(() => {
+      window.removeEventListener('resize', updateScrollAreaHeight);
     });
     
     return {
@@ -639,12 +887,15 @@ export default defineComponent({
       loadingStates,
       errorStates,
       activeSource,
-      currentPage,
-      pageSize,
+      displayedResults,
+      hasMoreData,
+      loadingMore,
+      scrollbarRef,
+      scrollAreaHeight,
       hotSearchTags,
       suggestions,
-      totalPages,
-      paginatedResults,
+      showActionRenderer,
+      currentActionData,
       performSearch,
       selectSource,
       getSourceName,
@@ -654,14 +905,18 @@ export default defineComponent({
       searchSuggestion,
       searchRecentTag,
       onSearchSettingsConfirm,
-      playVideo,
+      handleVideoClick,
       handleImageError,
-      onPageChange,
-      onPageSizeChange,
+      handleScroll,
+      handleActionClose,
       randomizeHotSearchTags,
       // 最近搜索
       recentSearches,
-      clearRecentSearches
+      clearRecentSearches,
+      // 工具函数
+      getFileTypeIcon,
+      isFolder,
+      isDirectoryFile
     };
   }
 });
@@ -951,14 +1206,19 @@ export default defineComponent({
   font-size: 14px;
 }
 
-.video-grid {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
-  height: 0; /* 强制flex子元素计算高度 */
+/* 搜索结果滚动容器 */
+.search-scroll-container {
+  border-radius: 8px;
+  border: 1px solid var(--color-border-2);
+}
+
+.search-results-grid {
+  padding: 16px;
+}
+
+/* 视频卡片样式 */
+.video-card-item {
+  width: 100%;
 }
 
 .video-card {
@@ -966,33 +1226,46 @@ export default defineComponent({
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   border: 1px solid var(--color-border-2);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .video-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-color: var(--color-primary-6);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-primary-light-4);
 }
 
 .video-poster {
   position: relative;
   width: 100%;
-  height: 120px;
+  height: 200px;
+  overflow: hidden;
+  flex-shrink: 0;
   background: var(--color-fill-2);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.video-poster img {
+.video-poster img,
+.video-poster-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.3s ease;
 }
 
-.poster-placeholder {
+.video-card:hover .video-poster img,
+.video-card:hover .video-poster-img {
+  transform: scale(1.05);
+}
+
+.folder-icon-container,
+.file-icon-container {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1001,13 +1274,55 @@ export default defineComponent({
   background: var(--color-fill-3);
 }
 
-.play-icon {
-  font-size: 32px;
+.folder-icon {
+  font-size: 48px;
   color: var(--color-text-3);
+}
+
+.play-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 50px;
+  height: 50px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.video-card:hover .play-overlay {
+  opacity: 1;
+}
+
+.action-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  background: var(--color-warning-6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  z-index: 2;
 }
 
 .video-info {
   padding: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .video-title {
@@ -1035,8 +1350,44 @@ export default defineComponent({
 
 .video-meta {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-3);
+  flex-wrap: wrap;
+}
+
+.video-note {
+  background: var(--color-primary-light-1);
+  color: var(--color-primary-6);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.video-year,
+.video-area {
+  color: var(--color-text-3);
+}
+
+.video-remarks-overlay {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+  z-index: 2;
 }
 
 .meta-item {
@@ -1047,15 +1398,31 @@ export default defineComponent({
   border-radius: 4px;
 }
 
-/* 分页样式 */
-.pagination-container {
-  padding: 20px;
-  border-top: 1px solid var(--color-border-2);
+/* 加载更多和无更多数据提示 */
+.loading-container,
+.no-more-data {
   display: flex;
+  align-items: center;
   justify-content: center;
-  background: var(--color-bg-1);
-  flex-shrink: 0;
+  gap: 8px;
+  padding: 20px;
+  color: var(--color-text-3);
+  font-size: 14px;
 }
+
+.loading-container {
+  color: var(--color-primary-6);
+}
+
+.loading-text {
+  margin-left: 8px;
+}
+
+.bottom-spacer {
+  height: 20px;
+}
+
+
 
 /* 状态样式 */
 .loading-state,
