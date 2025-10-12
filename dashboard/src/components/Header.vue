@@ -310,6 +310,11 @@ export default defineComponent({
       const selectedCount = settings.selectedSources ? settings.selectedSources.length : 0;
       Message.success(`已选择 ${selectedCount} 个搜索源`);
       this.showSearchSettings = false;
+      
+      // 触发自定义事件通知搜索源变更
+      window.dispatchEvent(new CustomEvent('searchSettingsChanged', {
+        detail: settings
+      }));
     },
     closeSearchResults() {
       // 关闭搜索结果，回到搜索页面的初始状态

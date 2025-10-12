@@ -1221,6 +1221,12 @@ export default defineComponent({
       return false;
     };
 
+    // 监听搜索设置变更事件，当搜索设置改变时重新加载搜索源
+    const handleSearchSettingsChange = (event) => {
+      console.log('检测到搜索设置变更，重新加载搜索源...', event.detail);
+      loadSearchSources();
+    };
+
     // 组件挂载时初始化
     onMounted(() => {
       loadSearchSources();
@@ -1230,6 +1236,9 @@ export default defineComponent({
       
       // 监听窗口大小变化
       window.addEventListener('resize', updateScrollAreaHeight);
+      
+      // 监听搜索设置变更事件
+      window.addEventListener('searchSettingsChanged', handleSearchSettingsChange);
       
       // 显示当前配置状态
       const settings = getSearchSettings();
@@ -1297,6 +1306,10 @@ export default defineComponent({
     onBeforeUnmount(() => {
       // 页面离开前保存状态
       savePageState();
+      
+      // 清理事件监听器
+      window.removeEventListener('resize', updateScrollAreaHeight);
+      window.removeEventListener('searchSettingsChanged', handleSearchSettingsChange);
       
       // 清理定时器
       if (saveStateTimer) {
