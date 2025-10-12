@@ -97,6 +97,7 @@
               <h4>搜索源</h4>
               <span class="sources-count">({{ searchStats.completed }}/{{ searchStats.total }})</span>
               <span class="sources-result-tag" v-if="searchStats.withData > 0">{{ searchStats.withData }}</span>
+              <span class="sources-time-tag" v-if="searchTotalTime > 0">{{ searchTotalTime.toFixed(2) }}s</span>
             </div>
             <div class="sources-list">
               <div 
@@ -336,6 +337,10 @@ export default defineComponent({
     // 搜索完成时间戳记录
     const searchCompletedTimes = ref({}); // 记录每个源完成搜索的时间戳
     
+    // 搜索耗时记录
+    const searchStartTime = ref(0); // 搜索开始时间戳
+    const searchTotalTime = ref(0); // 搜索总耗时（秒）
+    
     // ActionRenderer相关
     const showActionRenderer = ref(false);
     const currentActionData = ref(null);
@@ -500,6 +505,9 @@ export default defineComponent({
       const trimmedKeyword = keyword.trim();
       console.log('🔍 [performSearch] 开始执行搜索:', { trimmedKeyword });
       
+      // 记录搜索开始时间
+      searchStartTime.value = Date.now();
+      
       searchKeyword.value = trimmedKeyword;
       hasSearched.value = true;
       
@@ -511,6 +519,7 @@ export default defineComponent({
       currentPages.value = {};
       hasMorePages.value = {};
       searchCompletedTimes.value = {}; // 清空搜索完成时间戳
+      searchTotalTime.value = 0; // 重置搜索总耗时
       displayedCount.value = pageSize.value;
       
       console.log('🔍 [performSearch] 状态重置完成:', {
@@ -528,6 +537,12 @@ export default defineComponent({
       );
       
       await Promise.allSettled(searchPromises);
+      
+      // 计算搜索总耗时
+      const searchEndTime = Date.now();
+      searchTotalTime.value = (searchEndTime - searchStartTime.value) / 1000; // 转换为秒
+      console.log('🔍 [performSearch] 搜索完成，总耗时:', searchTotalTime.value.toFixed(2) + 's');
+      
       // 记录最近搜索
       try {
         const HISTORY_KEY = 'drplayer_search_history';
@@ -1318,6 +1333,7 @@ export default defineComponent({
       showActionRenderer,
       currentActionData,
       searchStats,
+      searchTotalTime,
       performSearch,
       selectSource,
       getSourceName,
@@ -1532,6 +1548,16 @@ export default defineComponent({
 
 .sources-result-tag {
   background: #52c41a;
+  color: white;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.sources-time-tag {
+  background: #1890ff;
   color: white;
   font-size: 12px;
   padding: 2px 8px;
