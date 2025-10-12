@@ -333,6 +333,9 @@ export default defineComponent({
     const currentPages = ref({}); // 每个源的当前页码
     const hasMorePages = ref({}); // 每个源是否还有更多页面
     
+    // 搜索完成时间戳记录
+    const searchCompletedTimes = ref({}); // 记录每个源完成搜索的时间戳
+    
     // ActionRenderer相关
     const showActionRenderer = ref(false);
     const currentActionData = ref(null);
@@ -372,13 +375,28 @@ export default defineComponent({
       return hasMoreFromServer || hasMoreFromLocal;
     });
     
-    // 过滤有结果的搜索源
+    // 过滤有结果的搜索源，并按搜索完成时间排序
     const sourcesWithResults = computed(() => {
-      return searchSources.value.filter(source => {
+      const sourcesWithData = searchSources.value.filter(source => {
         const results = searchResults.value[source.key];
         // 严格只显示有结果的源
         return results && results.length > 0;
       });
+      
+      // 按搜索完成时间排序，先完成的排在前面
+      const sortedSources = sourcesWithData.sort((a, b) => {
+        const timeA = searchCompletedTimes.value[a.key] || 0;
+        const timeB = searchCompletedTimes.value[b.key] || 0;
+        return timeA - timeB; // 升序排列，时间戳小的（先完成的）排在前面
+      });
+      
+      console.log('搜索源排序结果:', sortedSources.map(s => ({
+        name: s.name,
+        key: s.key,
+        completedTime: searchCompletedTimes.value[s.key]
+      })));
+      
+      return sortedSources;
     });
     
     // 搜索统计计算属性
@@ -481,6 +499,7 @@ export default defineComponent({
       errorStates.value = {};
       currentPages.value = {};
       hasMorePages.value = {};
+      searchCompletedTimes.value = {}; // 清空搜索完成时间戳
       displayedCount.value = pageSize.value;
       
       // 重置活跃源，让自动激活逻辑来处理
@@ -554,6 +573,12 @@ export default defineComponent({
         
         // 更新分页状态
         hasMorePages.value[source.key] = searchData.pagination?.hasNext !== false;
+        
+        // 记录搜索完成时间戳（仅在第一页时记录）
+        if (page === 1) {
+          searchCompletedTimes.value[source.key] = Date.now();
+          console.log(`搜索源 ${source.name} 完成搜索，时间戳: ${searchCompletedTimes.value[source.key]}`);
+        }
         
         delete errorStates.value[source.key];
       } catch (error) {
@@ -911,30 +936,28 @@ export default defineComponent({
       updateGlobalStats();
     });
 
-    // 监听搜索结果变化，自动激活第一个有结果的源
-    watch(searchResults, (newResults) => {
-      // 只有在有搜索结果且当前没有活跃源或当前活跃源没有结果时才自动切换
-      if (Object.keys(newResults).length > 0) {
-        // 找到第一个有结果的源
-        const firstSourceWithResults = sourcesWithResults.value.find(source => {
-          const results = newResults[source.key];
-          return results && results.length > 0;
-        });
+    // 监听有结果的源列表变化，自动激活第一个有结果的源
+    watch(sourcesWithResults, (newSourcesWithResults) => {
+      console.log('sourcesWithResults 变化:', newSourcesWithResults.map(s => s.name));
+      console.log('当前 activeSource:', activeSource.value);
+      
+      // 如果有结果的源列表不为空，且当前没有活跃源或当前活跃源没有结果
+      if (newSourcesWithResults.length > 0) {
+        const currentActiveHasResults = activeSource.value && 
+          searchResults.value[activeSource.value] && 
+          searchResults.value[activeSource.value].length > 0;
         
-        // 如果找到有结果的源，且当前没有活跃源或当前活跃源没有结果，则自动切换
-        if (firstSourceWithResults) {
-          const currentActiveHasResults = activeSource.value && 
-            newResults[activeSource.value] && 
-            newResults[activeSource.value].length > 0;
-          
-          // 如果当前没有活跃源，或当前活跃源没有结果，则切换到第一个有结果的源
-          if (!activeSource.value || !currentActiveHasResults) {
-            activeSource.value = firstSourceWithResults.key;
-            console.log(`自动激活第一个有结果的搜索源: ${firstSourceWithResults.name}`);
-          }
+        console.log('当前活跃源是否有结果:', currentActiveHasResults);
+        
+        // 如果当前没有活跃源，或当前活跃源没有结果，则激活第一个有结果的源
+        if (!activeSource.value || activeSource.value === '' || !currentActiveHasResults) {
+          const firstSourceWithResults = newSourcesWithResults[0];
+          activeSource.value = firstSourceWithResults.key;
+          console.log(`自动激活第一个有结果的搜索源: ${firstSourceWithResults.name} (${firstSourceWithResults.key})`);
+          console.log('激活后的 activeSource:', activeSource.value);
         }
       }
-    }, { deep: true });
+    });
     
     // 组件挂载时初始化
     onMounted(() => {
@@ -1221,8 +1244,17 @@ export default defineComponent({
 }
 
 .source-item.active {
-  background: var(--color-primary-1);
-  border: 1px solid var(--color-primary-6);
+  background: #1890ff !important;
+  border: 1px solid #0050b3 !important;
+  color: white !important;
+}
+
+.source-item.active .source-name {
+  color: white !important;
+}
+
+.source-item.active .source-count {
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 .source-info {
