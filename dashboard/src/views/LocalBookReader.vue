@@ -1,25 +1,26 @@
 <template>
-  <div class="local-book-reader" v-if="visible">
+  <div class="local-book-reader" v-if="visible" :style="readerStyles">
     <!-- 阅读器头部 -->
     <ReaderHeader
       :book-title="bookData?.title || ''"
-      :chapter-name="bookData?.author || ''"
-      :chapters="[]"
-      :current-chapter-index="0"
+      :chapter-name="currentChapter?.name || currentChapter?.title || ''"
+      :chapters="chapters"
+      :current-chapter-index="currentChapterIndex"
       :visible="true"
       :reading-settings="readingSettings"
       @close="handleClose"
-      @fullscreen="handleFullscreen"
-      @settings="showSettings = true"
-      @bookmarks="showBookmarks = true"
+      @settings-change="handleShowSettings"
+      @next-chapter="handleNextChapter"
+      @prev-chapter="handlePrevChapter"
+      @chapter-selected="handleChapterSelected"
     />
 
     <!-- 阅读内容区域 -->
-    <div class="reader-content" :style="readerStyles" ref="contentRef">
+    <div class="reader-content" :style="readerStyles" @scroll="handleScroll" ref="contentRef">
       <!-- 加载状态 -->
       <div v-if="loading" class="loading-container">
         <a-spin :size="40" />
-        <div class="loading-text">正在加载图书内容...</div>
+        <div class="loading-text">正在加载章节内容...</div>
       </div>
 
       <!-- 错误状态 -->
@@ -28,51 +29,74 @@
         <a-button type="primary" @click="retryLoad">重新加载</a-button>
       </div>
 
-      <!-- 图书内容 -->
-      <div v-else-if="bookContent" class="book-container" :style="bookContainerStyles">
-        <!-- 图书标题 -->
-        <div class="book-header">
-          <h1 class="book-title">{{ bookTitle }}</h1>
-          <div class="book-meta">
-            <span class="author">作者：{{ bookAuthor }}</span>
-            <span class="reading-time">阅读时间：{{ formatReadingTime }}</span>
-          </div>
-        </div>
+      <!-- 章节内容 -->
+      <div v-else-if="currentChapter" class="chapter-container" :style="bookContainerStyles">
+        <!-- 章节标题 -->
+        <h1 class="chapter-title" :style="titleStyles">
+          {{ currentChapter.title || currentChapter.name }}
+        </h1>
 
-        <!-- 图书正文 -->
+        <!-- 章节正文 -->
         <div 
-          class="book-text" 
+          class="chapter-text" 
           :style="textStyles"
-          @scroll="handleScroll"
-          ref="textRef"
         >
           <div 
-            v-for="(paragraph, index) in formattedContent" 
+            v-for="(paragraph, index) in formattedChapterContent" 
             :key="index"
             class="paragraph"
-            :class="{ 'chapter-title': paragraph.isChapter }"
           >
-            {{ paragraph.text }}
+            {{ paragraph }}
           </div>
         </div>
 
-        <!-- 阅读进度条 -->
-        <div class="progress-bar" v-if="readingSettings.showProgress">
-          <div class="progress-fill" :style="{ width: `${readingProgress}%` }"></div>
-          <div class="progress-text">{{ Math.round(readingProgress) }}%</div>
+        <!-- 章节导航 -->
+        <div class="chapter-navigation">
+          <a-button 
+            :disabled="currentChapterIndex <= 0" 
+            @click="handlePrevChapter"
+            class="nav-btn prev-btn"
+          >
+            <template #icon>
+              <icon-left />
+            </template>
+            上一章
+          </a-button>
+          
+          <span class="chapter-progress">
+            {{ currentChapterIndex + 1 }} / {{ chapters.length }}
+          </span>
+          
+          <a-button 
+            :disabled="currentChapterIndex >= chapters.length - 1" 
+            @click="handleNextChapter"
+            class="nav-btn next-btn"
+          >
+            下一章
+            <template #icon>
+              <icon-right />
+            </template>
+          </a-button>
         </div>
       </div>
 
       <!-- 空状态 -->
       <div v-else class="empty-container">
-        <a-empty description="未找到图书内容" />
+        <a-empty description="暂无章节内容" />
       </div>
+    </div>
+
+    <!-- 阅读进度条 -->
+    <div class="progress-bar" v-if="readingSettings.showProgress">
+      <div class="progress-fill" :style="{ width: `${readingProgress}%` }"></div>
+      <div class="progress-text">{{ Math.round(readingProgress) }}%</div>
     </div>
 
     <!-- 阅读设置对话框 -->
     <ReadingSettingsDialog
-      v-model:visible="showSettings"
-      v-model:settings="readingSettings"
+      :visible="showSettings"
+      :settings="readingSettings"
+      @close="showSettings = false"
       @settings-change="handleSettingsChange"
     />
 
@@ -92,10 +116,12 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Message } from '@arco-design/web-vue'
+import { IconLeft, IconRight } from '@arco-design/web-vue/es/icon'
 import ReaderHeader from '@/components/readers/ReaderHeader.vue'
 import ReadingSettingsDialog from '@/components/readers/ReadingSettingsDialog.vue'
 import BookmarkDialog from '@/components/readers/BookmarkDialog.vue'
 import localBookService from '@/services/localBookService'
+import { parseChapters } from '@/utils/chapterParser'
 
 const route = useRoute()
 const router = useRouter()
@@ -114,6 +140,11 @@ const bookContent = ref('')
 const bookTitle = ref('')
 const bookAuthor = ref('')
 
+// 章节数据
+const chapters = ref([])
+const currentChapterIndex = ref(0)
+const currentChapter = ref(null)
+
 // 阅读状态
 const currentPosition = ref(0)
 const readingProgress = ref(0)
@@ -122,17 +153,16 @@ const readingStartTime = ref(Date.now())
 
 // DOM引用
 const contentRef = ref(null)
-const textRef = ref(null)
 
-// 阅读设置
+// 阅读设置 - 与在线阅读器共享相同的localStorage键名和结构
 const readingSettings = ref({
   fontSize: 16,
   lineHeight: 1.8,
   fontFamily: 'system-ui',
-  maxWidth: 800,
-  theme: 'light',
   backgroundColor: '#ffffff',
   textColor: '#333333',
+  maxWidth: 800,
+  theme: 'light',
   padding: 40,
   showProgress: true,
   autoSave: true,
@@ -140,11 +170,36 @@ const readingSettings = ref({
 })
 
 // 计算属性
-const readerStyles = computed(() => ({
-  backgroundColor: readingSettings.value.backgroundColor,
-  color: readingSettings.value.textColor,
-  fontFamily: readingSettings.value.fontFamily
-}))
+const readerStyles = computed(() => {
+  let backgroundColor = readingSettings.value.backgroundColor
+  let textColor = readingSettings.value.textColor
+  
+  // 根据主题设置颜色
+  if (readingSettings.value.theme !== 'custom') {
+    const themeColors = {
+      light: { backgroundColor: '#ffffff', textColor: '#333333' },
+      dark: { backgroundColor: '#1a1a1a', textColor: '#e6e6e6' },
+      sepia: { backgroundColor: '#f4f1e8', textColor: '#5c4b37' },
+      green: { backgroundColor: '#c7edcc', textColor: '#2d5016' },
+      parchment: { backgroundColor: '#fdf6e3', textColor: '#657b83' },
+      night: { backgroundColor: '#2b2b2b', textColor: '#c9aa71' },
+      blue: { backgroundColor: '#e8f4f8', textColor: '#1e3a5f' },
+      pink: { backgroundColor: '#fdf2f8', textColor: '#831843' }
+    }
+    
+    const theme = themeColors[readingSettings.value.theme]
+    if (theme) {
+      backgroundColor = theme.backgroundColor
+      textColor = theme.textColor
+    }
+  }
+  
+  return {
+    backgroundColor,
+    color: textColor,
+    fontFamily: readingSettings.value.fontFamily
+  }
+})
 
 const bookContainerStyles = computed(() => ({
   maxWidth: `${readingSettings.value.maxWidth}px`,
@@ -152,34 +207,28 @@ const bookContainerStyles = computed(() => ({
   padding: `${readingSettings.value.padding}px`
 }))
 
+const titleStyles = computed(() => ({
+  fontSize: `${readingSettings.value.fontSize + 4}px`,
+  lineHeight: readingSettings.value.lineHeight,
+  fontFamily: readingSettings.value.fontFamily,
+  color: readerStyles.value.color
+}))
+
 const textStyles = computed(() => ({
   fontSize: `${readingSettings.value.fontSize}px`,
   lineHeight: readingSettings.value.lineHeight,
-  color: readingSettings.value.textColor
+  color: readerStyles.value.color,
+  maxWidth: `${readingSettings.value.maxWidth}px`,
+  margin: '0 auto'
 }))
 
-const formattedContent = computed(() => {
-  if (!bookContent.value) return []
+const formattedChapterContent = computed(() => {
+  if (!currentChapter.value?.content) return []
   
-  const lines = bookContent.value.split('\n')
-  const paragraphs = []
-  
-  lines.forEach(line => {
-    const trimmedLine = line.trim()
-    if (trimmedLine) {
-      // 检测章节标题（简单的规则：包含"第"和"章"的行）
-      const isChapter = /第.{1,10}章/.test(trimmedLine) || 
-                       /Chapter\s+\d+/i.test(trimmedLine) ||
-                       trimmedLine.length < 50 && /^[第\d\s章节回部分]+/.test(trimmedLine)
-      
-      paragraphs.push({
-        text: trimmedLine,
-        isChapter
-      })
-    }
-  })
-  
-  return paragraphs
+  return currentChapter.value.content
+    .split('\n')
+    .filter(line => line.trim())
+    .map(line => line.trim())
 })
 
 const formatReadingTime = computed(() => {
@@ -211,10 +260,19 @@ const loadBook = async () => {
     bookTitle.value = book.title
     bookAuthor.value = book.author
     
+    // 智能断章
+    await parseBookChapters()
+    
     // 加载阅读进度
     if (book.readingProgress) {
       currentPosition.value = book.readingProgress.position || 0
       readingProgress.value = book.readingProgress.percentage || 0
+      
+      // 恢复章节位置
+      if (book.readingProgress.chapterIndex !== undefined && chapters.value[book.readingProgress.chapterIndex]) {
+        currentChapterIndex.value = book.readingProgress.chapterIndex
+        currentChapter.value = chapters.value[book.readingProgress.chapterIndex]
+      }
     }
     
     // 加载书签
@@ -234,6 +292,92 @@ const loadBook = async () => {
   }
 }
 
+const parseBookChapters = async () => {
+  try {
+    if (!bookContent.value) return
+    
+    // 使用智能断章工具解析章节
+    const parsedChapters = parseChapters(bookContent.value)
+    
+    // 确保章节对象有name属性供ReaderHeader使用
+    chapters.value = parsedChapters.map(chapter => ({
+      ...chapter,
+      name: chapter.title || chapter.name || `第${chapter.id + 1}章`
+    }))
+    
+    if (chapters.value.length > 0) {
+      currentChapter.value = chapters.value[0]
+      currentChapterIndex.value = 0
+    }
+    
+    console.log(`成功解析 ${chapters.value.length} 个章节`)
+  } catch (error) {
+    console.error('章节解析失败:', error)
+    // 如果解析失败，创建一个默认章节
+    chapters.value = [{
+      title: bookTitle.value || '全文',
+      name: bookTitle.value || '全文',
+      content: bookContent.value,
+      startIndex: 0,
+      endIndex: bookContent.value.length
+    }]
+    currentChapter.value = chapters.value[0]
+    currentChapterIndex.value = 0
+  }
+}
+
+const handleNextChapter = () => {
+  if (currentChapterIndex.value < chapters.value.length - 1) {
+    currentChapterIndex.value++
+    currentChapter.value = chapters.value[currentChapterIndex.value]
+    
+    // 重置滚动位置
+    nextTick(() => {
+      if (contentRef.value) {
+        contentRef.value.scrollTop = 0
+      }
+    })
+    
+    saveReadingProgress()
+  } else {
+    Message.info('已经是最后一章了')
+  }
+}
+
+const handlePrevChapter = () => {
+  if (currentChapterIndex.value > 0) {
+    currentChapterIndex.value--
+    currentChapter.value = chapters.value[currentChapterIndex.value]
+    
+    // 重置滚动位置
+    nextTick(() => {
+      if (contentRef.value) {
+        contentRef.value.scrollTop = 0
+      }
+    })
+    
+    saveReadingProgress()
+  } else {
+    Message.info('已经是第一章了')
+  }
+}
+
+const handleChapterSelected = (chapterIndex) => {
+  if (chapterIndex >= 0 && chapterIndex < chapters.value.length) {
+    currentChapterIndex.value = chapterIndex
+    currentChapter.value = chapters.value[chapterIndex]
+    
+    // 重置滚动位置
+    nextTick(() => {
+      if (contentRef.value) {
+        contentRef.value.scrollTop = 0
+      }
+    })
+    
+    saveReadingProgress()
+  }
+}
+
 const retryLoad = () => {
   loadBook()
 }
@@ -244,8 +388,12 @@ const handleClose = () => {
   router.push('/book-gallery')
 }
 
-const handleShowSettings = () => {
-  showSettings.value = true
+const handleShowSettings = (event) => {
+  if (event && event.showDialog) {
+    showSettings.value = true
+  } else {
+    showSettings.value = true
+  }
 }
 
 const handleSettingsChange = (newSettings) => {
@@ -266,9 +414,9 @@ const handleFullscreen = () => {
 }
 
 const handleScroll = () => {
-  if (!textRef.value) return
+  if (!contentRef.value) return
   
-  const element = textRef.value
+  const element = contentRef.value
   const scrollTop = element.scrollTop
   const scrollHeight = element.scrollHeight
   const clientHeight = element.clientHeight
@@ -290,6 +438,7 @@ const saveReadingProgress = () => {
   const progress = {
     position: currentPosition.value,
     percentage: readingProgress.value,
+    chapterIndex: currentChapterIndex.value,
     lastReadTime: Date.now()
   }
   
@@ -297,14 +446,14 @@ const saveReadingProgress = () => {
 }
 
 const restoreReadingPosition = () => {
-  if (textRef.value && currentPosition.value > 0) {
-    textRef.value.scrollTop = currentPosition.value
+  if (contentRef.value && currentPosition.value > 0) {
+    contentRef.value.scrollTop = currentPosition.value
   }
 }
 
 const handleBookmarkSelected = (bookmark) => {
-  if (textRef.value) {
-    textRef.value.scrollTop = bookmark.position
+  if (contentRef.value) {
+    contentRef.value.scrollTop = bookmark.position
     currentPosition.value = bookmark.position
   }
   showBookmarks.value = false
@@ -369,10 +518,10 @@ const debouncedSaveProgress = () => {
   }, 1000)
 }
 
-// 加载阅读设置
+// 加载阅读设置 - 与在线阅读器共享设置
 const loadReadingSettings = () => {
   try {
-    const saved = localStorage.getItem('drplayer_book_reading_settings')
+    const saved = localStorage.getItem('drplayer_reading_settings')
     if (saved) {
       const settings = JSON.parse(saved)
       readingSettings.value = { ...readingSettings.value, ...settings }
@@ -382,10 +531,10 @@ const loadReadingSettings = () => {
   }
 }
 
-// 保存阅读设置
+// 保存阅读设置 - 与在线阅读器共享设置
 const saveReadingSettings = () => {
   try {
-    localStorage.setItem('drplayer_book_reading_settings', JSON.stringify(readingSettings.value))
+    localStorage.setItem('drplayer_reading_settings', JSON.stringify(readingSettings.value))
   } catch (error) {
     console.warn('保存阅读设置失败:', error)
   }
@@ -498,11 +647,6 @@ onUnmounted(() => {
   font-size: 14px;
 }
 
-.book-container {
-  min-height: 100vh;
-  position: relative;
-}
-
 .book-header {
   text-align: center;
   margin-bottom: 40px;
@@ -524,25 +668,62 @@ onUnmounted(() => {
   font-size: 14px;
 }
 
-.book-text {
-  max-height: calc(100vh - 200px);
-  overflow-y: auto;
-  padding: 20px 0;
+
+
+.chapter-title {
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  margin: 40px 0 30px 0;
+  color: var(--color-text-1);
+  border-bottom: 2px solid var(--color-border-2);
+  padding-bottom: 16px;
+}
+
+.chapter-text {
+  margin: 0 auto 60px;
+  text-align: justify;
+  word-break: break-word;
+  hyphens: auto;
+  line-height: 1.8;
 }
 
 .paragraph {
-  margin-bottom: 1em;
+  margin-bottom: 1.5em;
   text-align: justify;
   word-break: break-word;
   line-height: inherit;
+  text-indent: 2em;
 }
 
-.paragraph.chapter-title {
-  font-size: 1.2em;
-  font-weight: 600;
-  text-align: center;
-  margin: 2em 0 1.5em 0;
-  color: var(--color-primary);
+.chapter-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 40px;
+  padding: 20px 0;
+  border-top: 1px solid var(--color-border-2);
+}
+
+.nav-btn {
+  min-width: 120px;
+  height: 40px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.prev-btn {
+  margin-right: auto;
+}
+
+.next-btn {
+  margin-left: auto;
+}
+
+.chapter-progress {
+  font-size: 14px;
+  color: var(--color-text-2);
+  font-weight: 500;
 }
 
 .progress-bar {
@@ -574,37 +755,54 @@ onUnmounted(() => {
 }
 
 /* 滚动条样式 */
-.book-text::-webkit-scrollbar {
+.reader-content::-webkit-scrollbar {
   width: 6px;
 }
 
-.book-text::-webkit-scrollbar-track {
+.reader-content::-webkit-scrollbar-track {
   background: var(--color-fill-1);
   border-radius: 3px;
 }
 
-.book-text::-webkit-scrollbar-thumb {
+.reader-content::-webkit-scrollbar-thumb {
   background: var(--color-fill-3);
   border-radius: 3px;
 }
 
-.book-text::-webkit-scrollbar-thumb:hover {
+.reader-content::-webkit-scrollbar-thumb:hover {
   background: var(--color-fill-4);
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .book-container {
+  .chapter-container {
     padding: 20px !important;
   }
   
-  .book-title {
-    font-size: 24px;
+  .chapter-title {
+    font-size: 20px;
+    margin: 20px 0;
   }
   
-  .book-meta {
+  .chapter-navigation {
     flex-direction: column;
-    gap: 8px;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .nav-btn {
+    width: 100%;
+    margin: 0 !important;
+  }
+  
+  .chapter-progress {
+    text-align: center;
+    order: -1;
+  }
+  
+  .paragraph {
+    text-indent: 1.5em;
+    margin-bottom: 1.2em;
   }
 }
 </style>
