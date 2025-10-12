@@ -262,7 +262,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { defineComponent, ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Message } from '@arco-design/web-vue';
 import { 
@@ -611,6 +611,9 @@ export default defineComponent({
       const scrollHeight = container.scrollHeight - container.clientHeight;
       const scrollTop = container.scrollTop;
       
+      // 实时更新滚动位置
+      scrollPosition.value = scrollTop;
+      
       // 当滚动到距离底部50px以内时触发加载
       if (scrollHeight - scrollTop < 50 && hasMoreData.value && !loadingMore.value) {
         loadMore();
@@ -725,6 +728,12 @@ export default defineComponent({
               tempSiteExt: currentSource.ext,
               fromSpecialAction: 'true',
               from: 'search-aggregation',
+              // 添加来源页面信息，用于返回时恢复状态
+              sourceRouteName: 'SearchAggregation',
+              sourceRouteParams: JSON.stringify({}),
+              sourceRouteQuery: JSON.stringify({
+                keyword: searchKeyword.value
+              }),
               // 添加来源图片信息，用于详情页图片备用
               sourcePic: video.pic
             }
@@ -976,6 +985,98 @@ export default defineComponent({
       }
     });
     
+    // 滚动位置状态
+    const scrollPosition = ref(0);
+    
+    // 保存滚动位置
+    const saveScrollPosition = () => {
+      const scrollContainer = scrollbarRef.value?.$el?.querySelector('.arco-scrollbar-container');
+      if (scrollContainer) {
+        scrollPosition.value = scrollContainer.scrollTop;
+        console.log('🔄 [滚动位置] 保存滚动位置:', scrollPosition.value);
+      }
+    };
+    
+    // 恢复滚动位置
+    const restoreScrollPosition = () => {
+      if (scrollPosition.value > 0) {
+        nextTick(() => {
+          const scrollContainer = scrollbarRef.value?.$el?.querySelector('.arco-scrollbar-container');
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollPosition.value;
+            console.log('🔄 [滚动位置] 恢复滚动位置:', scrollPosition.value);
+          }
+        });
+      }
+    };
+
+    // 状态保存和恢复
+    const savePageState = () => {
+      if (hasSearched.value && searchKeyword.value) {
+        // 保存当前滚动位置
+        saveScrollPosition();
+        
+        const state = {
+          searchKeyword: searchKeyword.value,
+          hasSearched: hasSearched.value,
+          searchResults: searchResults.value,
+          loadingStates: loadingStates.value,
+          errorStates: errorStates.value,
+          activeSource: activeSource.value,
+          currentPages: currentPages.value,
+          hasMorePages: hasMorePages.value,
+          searchCompletedTimes: searchCompletedTimes.value,
+          displayedCount: displayedCount.value,
+          scrollPosition: scrollPosition.value,
+          scrollAreaHeight: scrollAreaHeight.value,
+          loadingMore: loadingMore.value
+        };
+        pageStateStore.savePageState('searchAggregation', state);
+        console.log('🔄 [状态保存] 保存聚合搜索页面状态:', state);
+      }
+    };
+
+    const restorePageState = () => {
+      const savedState = pageStateStore.getPageState('searchAggregation');
+      if (savedState && !pageStateStore.isStateExpired('searchAggregation')) {
+        console.log('🔄 [状态恢复] 恢复聚合搜索页面状态:', savedState);
+        
+        searchKeyword.value = savedState.searchKeyword || '';
+        hasSearched.value = savedState.hasSearched || false;
+        searchResults.value = savedState.searchResults || {};
+        loadingStates.value = savedState.loadingStates || {};
+        errorStates.value = savedState.errorStates || {};
+        activeSource.value = savedState.activeSource || '';
+        currentPages.value = savedState.currentPages || {};
+        hasMorePages.value = savedState.hasMorePages || {};
+        searchCompletedTimes.value = savedState.searchCompletedTimes || {};
+        displayedCount.value = savedState.displayedCount || 20;
+        loadingMore.value = savedState.loadingMore || false;
+        
+        // 恢复滚动位置和区域高度
+        scrollPosition.value = savedState.scrollPosition || 0;
+        if (savedState.scrollAreaHeight) {
+          scrollAreaHeight.value = savedState.scrollAreaHeight;
+        }
+        
+        // 更新全局统计信息
+        updateGlobalStats();
+        
+        // 延迟恢复滚动位置，确保DOM已渲染
+        if (scrollPosition.value > 0) {
+          // 使用多重延迟确保搜索结果完全渲染
+          nextTick(() => {
+            setTimeout(() => {
+              restoreScrollPosition();
+            }, 200);
+          });
+        }
+        
+        return true;
+      }
+      return false;
+    };
+
     // 组件挂载时初始化
     onMounted(() => {
       loadSearchSources();
@@ -991,8 +1092,43 @@ export default defineComponent({
       if (settings.selectedSources.length > 0) {
         console.log(`已恢复搜索源配置，共 ${settings.selectedSources.length} 个源`);
       }
+      
+      // 检查是否从详情页返回
+      const isReturnFromDetail = route.query._returnFromDetail === 'true';
+      console.log('🔄 [状态恢复] 是否从详情页返回:', isReturnFromDetail);
+      
+      // 尝试恢复页面状态
+      const restored = restorePageState();
+      if (restored) {
+        console.log('🔄 [状态恢复] 成功恢复聚合搜索页面状态');
+        
+        // 如果是从详情页返回，优先使用恢复的状态，不执行新搜索
+        if (isReturnFromDetail) {
+          console.log('🔄 [状态恢复] 从详情页返回，使用恢复的状态，不执行新搜索');
+        } else if (route.query.keyword && route.query.keyword !== searchKeyword.value) {
+          // 如果不是从详情页返回，且URL中有不同的关键词，则执行新的搜索
+          console.log('🔄 [状态恢复] URL关键词与恢复状态不同，执行新搜索:', route.query.keyword);
+          performSearch(route.query.keyword);
+        }
+      } else if (route.query.keyword) {
+        // 如果没有恢复状态但URL中有关键词，则执行搜索
+        console.log('🔄 [状态恢复] 没有保存状态，根据URL关键词执行搜索:', route.query.keyword);
+        performSearch(route.query.keyword);
+      }
+      
+      // 清理URL中的返回标识
+      if (isReturnFromDetail) {
+        const newQuery = { ...route.query };
+        delete newQuery._returnFromDetail;
+        router.replace({ query: newQuery });
+      }
     });
     
+    onBeforeUnmount(() => {
+      // 页面离开前保存状态
+      savePageState();
+    });
+
     onUnmounted(() => {
       window.removeEventListener('resize', updateScrollAreaHeight);
     });

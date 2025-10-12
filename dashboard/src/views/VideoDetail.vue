@@ -946,6 +946,10 @@ const goBack = () => {
             console.log('发现保存的Video页面状态，将恢复状态而非重新加载');
           }
         }
+      } else if (sourceRouteName === 'SearchAggregation') {
+        // 返回聚合搜索页面，添加返回标识
+        console.log('从聚合搜索页面返回，添加返回标识');
+        query._returnFromDetail = 'true';
       } else if (sourceRouteName === 'Home') {
         // 返回Home页面，检查搜索状态
         const savedSearchState = pageStateStore.getPageState('search');
