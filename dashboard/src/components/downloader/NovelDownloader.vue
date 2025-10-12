@@ -43,13 +43,44 @@
 
     <!-- 过滤标签 -->
     <div class="filter-tabs">
-      <a-radio-group v-model="activeFilter" type="button">
-        <a-radio value="all">全部 ({{ totalTasks }})</a-radio>
-        <a-radio value="downloading">下载中 ({{ downloadingTasks }})</a-radio>
-        <a-radio value="completed">已完成 ({{ completedTasks }})</a-radio>
-        <a-radio value="failed">失败 ({{ failedTasks }})</a-radio>
-        <a-radio value="pending">等待中 ({{ pendingTasks }})</a-radio>
-      </a-radio-group>
+      <div class="filter-left">
+        <a-radio-group v-model="activeFilter" type="button">
+          <a-radio value="all">全部 ({{ totalTasks }})</a-radio>
+          <a-radio value="downloading">下载中 ({{ downloadingTasks }})</a-radio>
+          <a-radio value="completed">已完成 ({{ completedTasks }})</a-radio>
+          <a-radio value="failed">失败 ({{ failedTasks }})</a-radio>
+          <a-radio value="pending">等待中 ({{ pendingTasks }})</a-radio>
+        </a-radio-group>
+      </div>
+      
+      <!-- 储存空间统计 -->
+        <div class="storage-stats" v-if="downloadStore.tasks.length > 0">
+          <div class="storage-info">
+            <div class="storage-header">
+               <icon-download class="storage-icon" />
+               <span class="storage-title">本地储存空间</span>
+              <a-tag 
+                :color="storageStats.isOverLimit ? 'red' : storageStats.isNearLimit ? 'orange' : 'green'"
+                size="small"
+              >
+                {{ Math.round(storageStats.usagePercentage) }}%
+              </a-tag>
+            </div>
+            <div class="storage-progress">
+              <a-progress 
+                :percent="storageStats.usagePercentage" 
+                :color="storageStats.isOverLimit ? '#f53f3f' : storageStats.isNearLimit ? '#ff7d00' : '#00b42a'"
+                :show-text="false"
+                size="small"
+              />
+            </div>
+            <div class="storage-details">
+              <span class="storage-used">已用: {{ storageStats.formattedUsed }}</span>
+              <span class="storage-available">可用: {{ storageStats.formattedAvailable }}</span>
+              <span class="storage-total">总计: {{ storageStats.formattedTotal }}</span>
+            </div>
+          </div>
+        </div>
     </div>
 
     <!-- 下载任务列表 -->
@@ -92,6 +123,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Message } from '@arco-design/web-vue'
 import { 
   IconDownload, 
@@ -102,6 +134,7 @@ import DownloadTaskItem from './DownloadTaskItem.vue'
 import AddDownloadTaskDialog from './AddDownloadTaskDialog.vue'
 import ChapterDetailsDialog from './ChapterDetailsDialog.vue'
 import { useDownloadStore } from '@/stores/downloadStore'
+import downloadService from '@/services/downloadService'
 
 // Props
 const props = defineProps({
@@ -114,7 +147,8 @@ const props = defineProps({
 // Emits
 const emit = defineEmits(['close'])
 
-// 下载状态管理
+// 路由和状态管理
+const router = useRouter()
 const downloadStore = useDownloadStore()
 
 // 响应式数据
@@ -122,6 +156,7 @@ const activeFilter = ref('all')
 const showAddTaskDialog = ref(false)
 const showChapterDialog = ref(false)
 const selectedTask = ref(null)
+const storageStats = ref({}) // 储存空间统计
 
 // 计算属性
 const totalTasks = computed(() => downloadStore.tasks.length)
@@ -146,37 +181,48 @@ const currentSelectedTask = computed(() => {
 
 // 方法
 const handleClose = () => {
-  emit('close')
+  // 使用Vue Router导航，返回上一页或首页
+  if (window.history.length > 1) {
+    router.go(-1)
+  } else {
+    router.push('/')
+  }
 }
 
 const handleAddTask = (taskData) => {
   downloadStore.addTask(taskData)
+  updateStorageStats() // 更新储存统计
   showAddTaskDialog.value = false
   Message.success('下载任务已添加')
 }
 
 const handleRetryTask = (taskId) => {
   downloadStore.retryTask(taskId)
+  updateStorageStats() // 更新储存统计
   Message.info('正在重试下载任务')
 }
 
 const handlePauseTask = (taskId) => {
   downloadStore.pauseTask(taskId)
+  updateStorageStats() // 更新储存统计
   Message.info('下载任务已暂停')
 }
 
 const handleResumeTask = (taskId) => {
   downloadStore.resumeTask(taskId)
+  updateStorageStats() // 更新储存统计
   Message.info('下载任务已恢复')
 }
 
 const handleCancelTask = (taskId) => {
   downloadStore.cancelTask(taskId)
+  updateStorageStats() // 更新储存统计
   Message.info('下载任务已取消')
 }
 
 const handleDeleteTask = (taskId) => {
   downloadStore.deleteTask(taskId)
+  updateStorageStats() // 更新储存统计
   Message.success('下载任务已删除')
 }
 
@@ -196,12 +242,19 @@ const handleRetryChapter = (taskId, chapterIndex) => {
 
 const clearCompleted = () => {
   downloadStore.clearCompleted()
+  updateStorageStats() // 更新储存统计
   Message.success('已清理完成的下载任务')
+}
+
+// 更新储存空间统计
+const updateStorageStats = () => {
+  storageStats.value = downloadService.getStorageStats()
 }
 
 // 生命周期
 onMounted(() => {
   downloadStore.loadTasks()
+  updateStorageStats() // 初始化储存统计
 })
 
 onUnmounted(() => {
@@ -258,8 +311,66 @@ onUnmounted(() => {
 }
 
 .filter-tabs {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 16px 24px;
   border-bottom: 1px solid var(--color-border-2);
+}
+
+.filter-left {
+  flex: 1;
+}
+
+.storage-stats {
+  min-width: 200px;
+}
+
+.storage-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.storage-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.storage-icon {
+  font-size: 14px;
+  color: var(--color-text-2);
+}
+
+.storage-title {
+  font-size: 12px;
+  color: var(--color-text-2);
+  font-weight: 500;
+}
+
+.storage-progress {
+  width: 100%;
+}
+
+.storage-details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-3);
+}
+
+.storage-used {
+  color: var(--color-text-1);
+  font-weight: 500;
+}
+
+.storage-available {
+  color: var(--color-text-2);
+}
+
+.storage-total {
+  color: var(--color-text-2);
 }
 
 .download-list {

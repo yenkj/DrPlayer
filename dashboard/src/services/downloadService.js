@@ -475,6 +475,48 @@ class DownloadService {
     }
   }
 
+  // 获取储存空间统计
+  getStorageStats() {
+    const STORAGE_LIMIT = 100 * 1024 * 1024 // 100MB 限制，与书画柜独立
+    
+    // 计算所有下载任务的总大小
+    const usedBytes = this.getAllTasks().reduce((total, task) => {
+      return total + (task.downloadedSize || 0)
+    }, 0)
+    
+    const availableBytes = Math.max(0, STORAGE_LIMIT - usedBytes)
+    const usagePercentage = (usedBytes / STORAGE_LIMIT) * 100
+    
+    return {
+      usedBytes,
+      availableBytes,
+      totalBytes: STORAGE_LIMIT,
+      usagePercentage: Math.min(100, usagePercentage),
+      isNearLimit: usagePercentage > 80,
+      isOverLimit: usagePercentage >= 100,
+      formattedUsed: this.formatFileSize(usedBytes),
+      formattedAvailable: this.formatFileSize(availableBytes),
+      formattedTotal: this.formatFileSize(STORAGE_LIMIT)
+    }
+  }
+
+  // 格式化文件大小
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 B'
+    
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  // 检查是否可以添加新任务（基于大小限制）
+  canAddTask(estimatedSize = 0) {
+    const storageStats = this.getStorageStats()
+    return estimatedSize <= storageStats.availableBytes
+  }
+
   // 保存任务到本地存储
   saveTasksToStorage() {
     try {
