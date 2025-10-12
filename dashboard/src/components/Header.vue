@@ -513,25 +513,37 @@ export default defineComponent({
 .search-container {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0;
   width: 100%;
   max-width: 450px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-1);
+  padding: 4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.search-container:hover {
+  border-color: var(--color-border-3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* 搜索框样式 */
 .search-container :deep(.arco-input-search) {
   flex: 1;
-  border-radius: 8px;
-  background: var(--color-bg-1);
-  border: 1px solid var(--color-border-2);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
 .search-container :deep(.arco-input-search:hover) {
-  border-color: var(--color-border-3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 /* 聚合搜索页面时的搜索框样式 */
@@ -552,57 +564,64 @@ export default defineComponent({
 
 /* 搜索设置按钮样式 */
 .search-settings-btn {
-  width: 36px !important;
-  height: 36px !important;
-  border-radius: 8px !important;
-  border: 1px solid var(--color-border-2) !important;
-  background: var(--color-bg-2) !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 4px !important;
+  border: none !important;
+  background: transparent !important;
   color: var(--color-text-2) !important;
   transition: all 0.2s ease !important;
   flex-shrink: 0;
+  margin-left: 4px;
 }
 
 .search-settings-btn:hover {
-  background: var(--color-fill-3) !important;
-  border-color: var(--color-border-3) !important;
+  background: var(--color-fill-2) !important;
+  border: none !important;
   color: var(--color-text-1) !important;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  transform: none;
+  box-shadow: none !important;
 }
 
 .search-settings-btn:active {
-  transform: translateY(0) !important;
-  background: var(--color-fill-4) !important;
+  transform: none !important;
+  background: var(--color-fill-3) !important;
 }
 
 /* 关闭搜索按钮样式 */
 .close-search-btn {
-  width: 36px !important;
-  height: 36px !important;
-  border-radius: 8px !important;
-  border: 1px solid var(--color-border-2) !important;
-  background: var(--color-bg-2) !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 4px !important;
+  border: none !important;
+  background: transparent !important;
   color: var(--color-text-2) !important;
   transition: all 0.2s ease !important;
   flex-shrink: 0;
+  margin-left: 4px;
 }
 
 .close-search-btn:hover {
   background: var(--color-danger-light-1) !important;
-  border-color: var(--color-danger-light-3) !important;
+  border: none !important;
   color: var(--color-danger-6) !important;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(245, 63, 63, 0.15) !important;
+  transform: none;
+  box-shadow: none !important;
 }
 
 .close-search-btn:active {
-  transform: translateY(0) !important;
+  transform: none !important;
   background: var(--color-danger-light-2) !important;
 }
 
-.search-container :deep(.arco-input-search:focus-within) {
+.search-container:focus-within {
   border-color: var(--color-primary-6);
   box-shadow: 0 0 0 2px var(--color-primary-1);
+}
+
+.search-container :deep(.arco-input-search:focus-within) {
+  border: none;
+  box-shadow: none;
 }
 
 .search-container :deep(.arco-input-wrapper) {
