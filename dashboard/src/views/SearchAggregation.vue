@@ -995,24 +995,43 @@ export default defineComponent({
     watch(() => route.query, (newQuery, oldQuery) => {
       const keyword = newQuery.keyword;
       const oldKeyword = oldQuery?.keyword;
+      const isReturnFromDetail = newQuery._returnFromDetail === 'true';
+      const newTimestamp = newQuery._t;
+      const oldTimestamp = oldQuery?._t;
+      
+      // 检查是否只是时间戳参数变化（用于强制重新搜索）
+      const isTimestampOnlyChange = keyword === oldKeyword && newTimestamp !== oldTimestamp;
       
       console.log('🔄 [路由监听] query变化:', { 
         newQuery, 
         oldQuery, 
         keyword, 
         oldKeyword, 
-        currentKeyword: searchKeyword.value 
+        currentKeyword: searchKeyword.value,
+        isReturnFromDetail,
+        isTimestampOnlyChange,
+        newTimestamp,
+        oldTimestamp
       });
       console.log('🔄 [路由监听] keyword类型:', typeof keyword, '值:', keyword);
       console.log('🔄 [路由监听] 条件判断 keyword存在:', !!keyword);
       
       if (keyword) {
-        // 只要有keyword参数，就执行搜索（用户点击搜索按钮时应该重新搜索）
-        console.log('🔄 [路由监听] 准备执行搜索:', keyword);
-        searchKeyword.value = keyword;
-        console.log('🔄 [路由监听] 即将调用performSearch');
-        performSearch(keyword);
-        console.log('🔄 [路由监听] performSearch调用完成');
+        if (isReturnFromDetail) {
+          // 从详情页返回时，不立即执行搜索，让状态恢复逻辑处理
+          console.log('🔄 [路由监听] 从详情页返回，跳过路由监听器的搜索，等待状态恢复逻辑处理');
+          searchKeyword.value = keyword; // 只更新关键词，不执行搜索
+        } else if (isTimestampOnlyChange || keyword !== searchKeyword.value) {
+          // 时间戳变化（强制重新搜索）或关键词变化时才执行搜索
+          console.log('🔄 [路由监听] 准备执行搜索:', keyword, isTimestampOnlyChange ? '(时间戳强制)' : '(关键词变化)');
+          searchKeyword.value = keyword;
+          console.log('🔄 [路由监听] 即将调用performSearch');
+          performSearch(keyword);
+          console.log('🔄 [路由监听] performSearch调用完成');
+        } else {
+          // 关键词相同且不是时间戳强制更新，跳过搜索
+          console.log('🔄 [路由监听] 关键词相同且无时间戳强制更新，跳过搜索');
+        }
       } else {
         // 当没有keyword参数时，重置搜索状态
         console.log('🔄 [路由监听] 清空搜索状态');

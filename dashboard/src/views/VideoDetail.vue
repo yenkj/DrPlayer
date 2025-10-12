@@ -950,6 +950,11 @@ const goBack = () => {
         // 返回聚合搜索页面，添加返回标识
         console.log('从聚合搜索页面返回，添加返回标识');
         query._returnFromDetail = 'true';
+        // 清除时间戳参数，避免触发重新搜索
+        if (query._t) {
+          delete query._t;
+          console.log('清除时间戳参数 _t，避免触发重新搜索');
+        }
       } else if (sourceRouteName === 'Home') {
         // 返回Home页面，检查搜索状态
         const savedSearchState = pageStateStore.getPageState('search');
