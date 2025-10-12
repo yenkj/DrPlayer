@@ -26,6 +26,9 @@ class DownloadService {
       novelTitle: novelInfo.title,
       novelId: novelInfo.id,
       novelUrl: novelInfo.url,
+      novelAuthor: novelInfo.author || '未知',
+      novelDescription: novelInfo.description || '',
+      novelCover: novelInfo.cover || '', // 保存封面图片
       totalChapters: selectedChapters.length,
       completedChapters: 0,
       failedChapters: 0,
@@ -417,6 +420,35 @@ class DownloadService {
   // 获取所有任务
   getAllTasks() {
     return Array.from(this.tasks.values()).sort((a, b) => b.createdAt - a.createdAt)
+  }
+
+  // 获取单个任务
+  getTask(taskId) {
+    return this.tasks.get(taskId)
+  }
+
+  // 生成TXT内容
+  generateTxtContent(taskId) {
+    const task = this.tasks.get(taskId)
+    if (!task) return null
+
+    const completedChapters = task.chapters
+      .filter(ch => ch.status === 'completed')
+      .sort((a, b) => a.index - b.index)
+
+    if (completedChapters.length === 0) {
+      return null
+    }
+
+    let content = `${task.novelTitle}\n\n`
+    
+    completedChapters.forEach(chapter => {
+      content += `${chapter.name}\n\n`
+      content += `${chapter.content}\n\n`
+      content += '---\n\n'
+    })
+
+    return content
   }
 
   // 根据状态过滤任务

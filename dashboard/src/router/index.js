@@ -23,6 +23,7 @@ const routes = [
     {path: '/settings', component: Settings, name: 'Settings'},
     {path: '/collection', component: Collection, name: 'Collection'},
     {path: '/book-gallery', component: BookGallery, name: 'BookGallery'},
+    {path: '/local-book-reader/:bookId', component: () => import('@/views/LocalBookReader.vue'), name: 'LocalBookReader', props: true},
     {path: '/download-manager', component: () => import('@/components/downloader/NovelDownloader.vue'), name: 'DownloadManager'},
     {path: '/history', component: History, name: 'History'},
     {path: '/parser', component: Parser, name: 'Parser'},

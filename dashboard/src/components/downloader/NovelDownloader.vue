@@ -180,8 +180,8 @@ const handleDeleteTask = (taskId) => {
   Message.success('下载任务已删除')
 }
 
-const handleExportTask = (taskId) => {
-  downloadStore.exportTask(taskId)
+const handleExportTask = async (taskId, options = {}) => {
+  await downloadStore.exportTask(taskId, options)
 }
 
 const handleViewChapters = (task) => {

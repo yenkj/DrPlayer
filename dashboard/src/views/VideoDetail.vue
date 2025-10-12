@@ -2158,7 +2158,8 @@ const handleDownloadConfirm = async (taskData) => {
       id: taskData.novelDetail.vod_id,
       url: currentEpisodeUrl.value || '',
       author: taskData.novelDetail.vod_actor || '未知',
-      description: taskData.novelDetail.vod_content || ''
+      description: taskData.novelDetail.vod_content || '',
+      cover: taskData.novelDetail.vod_pic || '' // 添加封面图片
     }
     
     // 准备选中的章节信息

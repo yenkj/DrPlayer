@@ -110,12 +110,29 @@
       </a-button-group>
 
       <a-button-group v-else-if="task.status === 'completed'">
-        <a-button size="small" type="primary" @click="$emit('export', task.id)">
-          <template #icon>
-            <icon-download />
+        <a-dropdown @select="handleExportSelect">
+          <a-button size="small" type="primary">
+            <template #icon>
+              <icon-download />
+            </template>
+            导出
+            <icon-down />
+          </a-button>
+          <template #content>
+            <a-doption value="download">
+              <template #icon>
+                <icon-download />
+              </template>
+              下载TXT文件
+            </a-doption>
+            <a-doption value="gallery">
+              <template #icon>
+                <icon-book />
+              </template>
+              导出到书画柜
+            </a-doption>
           </template>
-          导出TXT
-        </a-button>
+        </a-dropdown>
         <a-button size="small" @click="$emit('delete', task.id)">
           <template #icon>
             <icon-delete />
@@ -164,7 +181,8 @@ import {
   IconList, 
   IconDown, 
   IconUp,
-  IconExclamationCircleFill
+  IconExclamationCircleFill,
+  IconBook
 } from '@arco-design/web-vue/es/icon'
 
 // Props
@@ -176,7 +194,7 @@ const props = defineProps({
 })
 
 // Emits
-defineEmits([
+const emit = defineEmits([
   'retry', 
   'pause', 
   'resume', 
@@ -238,6 +256,15 @@ const downloadSpeed = computed(() => {
 // 方法
 const toggleDetails = () => {
   showDetails.value = !showDetails.value
+}
+
+// 处理导出选择
+const handleExportSelect = (value) => {
+  if (value === 'download') {
+    emit('export', props.task.id, { exportToGallery: false })
+  } else if (value === 'gallery') {
+    emit('export', props.task.id, { exportToGallery: true })
+  }
 }
 
 const formatTime = (timestamp) => {
