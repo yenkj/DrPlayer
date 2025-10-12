@@ -2,15 +2,23 @@
   <a-modal
       v-model:visible="modalVisible"
       title="搜索设置"
-      :width="600"
+      :width="800"
       :mask-closable="false"
       @ok="handleConfirm"
       @cancel="handleCancel"
   >
     <div class="search-settings">
       <div class="settings-header">
-        <h4>选择搜索源</h4>
-        <p class="settings-desc">选择要参与聚合搜索的数据源</p>
+        <div class="header-left">
+          <h4>选择搜索源</h4>
+          <p class="settings-desc">选择要参与聚合搜索的数据源</p>
+        </div>
+        <div class="header-right">
+          <div class="search-tip">
+            <icon-info-circle class="tip-icon"/>
+            <span class="tip-text">只有 searchable 属性不为 0 的源才支持搜索功能</span>
+          </div>
+        </div>
       </div>
       
       <div class="sources-section">
@@ -113,14 +121,7 @@
         </div>
       </div>
       
-      <div class="settings-footer">
-        <div class="footer-info">
-          <icon-info-circle class="info-icon"/>
-          <span class="info-text">
-            只有 searchable 属性不为 0 的源才支持搜索功能
-          </span>
-        </div>
-      </div>
+
     </div>
     
     <template #footer>
@@ -382,10 +383,17 @@ export default defineComponent({
 }
 
 .settings-header {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
-.settings-header h4 {
+.header-left {
+  flex: 1;
+}
+
+.header-left h4 {
   margin: 0 0 8px 0;
   font-size: 16px;
   font-weight: 600;
@@ -399,8 +407,36 @@ export default defineComponent({
   line-height: 1.5;
 }
 
+.header-right {
+  flex-shrink: 0;
+  margin-left: 24px;
+}
+
+.search-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--color-fill-1);
+  border-radius: 6px;
+  border: 1px solid var(--color-border-2);
+}
+
+.tip-icon {
+  font-size: 14px;
+  color: var(--color-primary-6);
+  flex-shrink: 0;
+}
+
+.tip-text {
+  font-size: 12px;
+  color: var(--color-text-2);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
 .sources-section {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 
 .section-header {
@@ -441,20 +477,32 @@ export default defineComponent({
 }
 
 .sources-list {
-  max-height: 400px;
+  max-height: 480px;
   overflow-y: auto;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
   background: var(--color-bg-1);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
 }
 
 .source-item {
-  padding: 16px;
+  padding: 12px;
   border-bottom: 1px solid var(--color-border-2);
+  border-right: 1px solid var(--color-border-2);
   transition: background-color 0.2s ease;
 }
 
-.source-item:last-child {
+.source-item:nth-child(odd) {
+  border-right: 1px solid var(--color-border-2);
+}
+
+.source-item:nth-child(even) {
+  border-right: none;
+}
+
+.source-item:nth-last-child(-n+2) {
   border-bottom: none;
 }
 
@@ -479,32 +527,38 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .source-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-text-1);
+  flex: 1;
+  margin-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .source-tags {
   display: flex;
-  gap: 6px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .source-meta {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .meta-item {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-3);
   background: var(--color-fill-2);
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 1px 6px;
+  border-radius: 3px;
 }
 
 .empty-sources {
@@ -533,31 +587,7 @@ export default defineComponent({
   color: var(--color-text-4);
 }
 
-.settings-footer {
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border-2);
-}
 
-.footer-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: var(--color-fill-1);
-  border-radius: 6px;
-}
-
-.info-icon {
-  font-size: 16px;
-  color: var(--color-primary-6);
-  flex-shrink: 0;
-}
-
-.info-text {
-  font-size: 13px;
-  color: var(--color-text-2);
-  line-height: 1.4;
-}
 
 .modal-footer {
   display: flex;
