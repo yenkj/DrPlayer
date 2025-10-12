@@ -95,11 +95,12 @@
           <div class="sources-sidebar">
             <div class="sources-header">
               <h4>搜索源</h4>
-              <span class="sources-count">({{ searchSources.length }})</span>
+              <span class="sources-count">({{ searchStats.completed }}/{{ searchStats.total }})</span>
+              <span class="sources-result-tag" v-if="searchStats.withData > 0">{{ searchStats.withData }}</span>
             </div>
             <div class="sources-list">
               <div 
-                  v-for="source in searchSources" 
+                  v-for="source in sourcesWithResults" 
                   :key="source.key"
                   class="source-item"
                   :class="{ active: activeSource === source.key }"
@@ -371,6 +372,50 @@ export default defineComponent({
       return hasMoreFromServer || hasMoreFromLocal;
     });
     
+    // 过滤有结果的搜索源
+    const sourcesWithResults = computed(() => {
+      return searchSources.value.filter(source => {
+        const results = searchResults.value[source.key];
+        // 严格只显示有结果的源
+        return results && results.length > 0;
+      });
+    });
+    
+    // 搜索统计计算属性
+    const searchStats = computed(() => {
+      const totalSources = searchSources.value.length;
+      let completedSources = 0;
+      let sourcesWithData = 0;
+      let sourcesWithoutData = 0;
+      
+      // 计算已完成搜索的源数量（包括成功和失败的）
+      searchSources.value.forEach(source => {
+        const isLoading = loadingStates.value[source.key];
+        const hasResults = searchResults.value[source.key] !== undefined;
+        const hasError = errorStates.value[source.key] !== undefined;
+        const resultCount = searchResults.value[source.key]?.length || 0;
+        
+        // 如果不在加载中，且有结果或有错误，则认为已完成
+        if (!isLoading && (hasResults || hasError)) {
+          completedSources++;
+          
+          // 区分有数据和无数据的源
+          if (resultCount > 0) {
+            sourcesWithData++;
+          } else {
+            sourcesWithoutData++;
+          }
+        }
+      });
+      
+      return {
+        completed: completedSources,
+        total: totalSources,
+        withData: sourcesWithData,
+        withoutData: sourcesWithoutData
+      };
+    });
+    
     // 方法
     const loadSearchSources = () => {
       try {
@@ -438,10 +483,8 @@ export default defineComponent({
       hasMorePages.value = {};
       displayedCount.value = pageSize.value;
       
-      // 设置第一个源为活跃源
-      if (searchSources.value.length > 0) {
-        activeSource.value = searchSources.value[0].key;
-      }
+      // 重置活跃源，让自动激活逻辑来处理
+      activeSource.value = '';
       
       // 并行搜索所有源
       const searchPromises = searchSources.value.map(source => 
@@ -856,6 +899,31 @@ export default defineComponent({
     watch(activeSource, () => {
       updateGlobalStats();
     });
+
+    // 监听搜索结果变化，自动激活第一个有结果的源
+    watch(searchResults, (newResults) => {
+      // 只有在有搜索结果且当前没有活跃源或当前活跃源没有结果时才自动切换
+      if (Object.keys(newResults).length > 0) {
+        // 找到第一个有结果的源
+        const firstSourceWithResults = sourcesWithResults.value.find(source => {
+          const results = newResults[source.key];
+          return results && results.length > 0;
+        });
+        
+        // 如果找到有结果的源，且当前没有活跃源或当前活跃源没有结果，则自动切换
+        if (firstSourceWithResults) {
+          const currentActiveHasResults = activeSource.value && 
+            newResults[activeSource.value] && 
+            newResults[activeSource.value].length > 0;
+          
+          // 如果当前没有活跃源，或当前活跃源没有结果，则切换到第一个有结果的源
+          if (!activeSource.value || !currentActiveHasResults) {
+            activeSource.value = firstSourceWithResults.key;
+            console.log(`自动激活第一个有结果的搜索源: ${firstSourceWithResults.name}`);
+          }
+        }
+      }
+    }, { deep: true });
     
     // 组件挂载时初始化
     onMounted(() => {
@@ -883,6 +951,7 @@ export default defineComponent({
       hasSearched,
       showSearchSettings,
       searchSources,
+      sourcesWithResults,
       searchResults,
       loadingStates,
       errorStates,
@@ -896,6 +965,7 @@ export default defineComponent({
       suggestions,
       showActionRenderer,
       currentActionData,
+      searchStats,
       performSearch,
       selectSource,
       getSourceName,
@@ -1105,6 +1175,16 @@ export default defineComponent({
 .sources-count {
   color: var(--color-text-3);
   font-size: 14px;
+}
+
+.sources-result-tag {
+  background: #52c41a;
+  color: white;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+  margin-left: 8px;
 }
 
 .sources-list {
