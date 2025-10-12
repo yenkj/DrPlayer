@@ -485,15 +485,26 @@ export default defineComponent({
     };
     
     const performSearch = async (keyword) => {
+      console.log('🔍 [performSearch] 方法被调用:', { 
+        keyword, 
+        currentKeyword: searchKeyword.value,
+        hasSearched: hasSearched.value,
+        currentResults: Object.keys(searchResults.value).length
+      });
+      
       if (!keyword || !keyword.trim()) {
         Message.warning('请输入搜索关键词');
         return;
       }
       
-      searchKeyword.value = keyword.trim();
+      const trimmedKeyword = keyword.trim();
+      console.log('🔍 [performSearch] 开始执行搜索:', { trimmedKeyword });
+      
+      searchKeyword.value = trimmedKeyword;
       hasSearched.value = true;
       
       // 重置状态
+      console.log('🔍 [performSearch] 重置搜索状态...');
       searchResults.value = {};
       loadingStates.value = {};
       errorStates.value = {};
@@ -501,6 +512,12 @@ export default defineComponent({
       hasMorePages.value = {};
       searchCompletedTimes.value = {}; // 清空搜索完成时间戳
       displayedCount.value = pageSize.value;
+      
+      console.log('🔍 [performSearch] 状态重置完成:', {
+        searchResults: Object.keys(searchResults.value).length,
+        loadingStates: Object.keys(loadingStates.value).length,
+        hasSearched: hasSearched.value
+      });
       
       // 重置活跃源，让自动激活逻辑来处理
       activeSource.value = '';
@@ -578,6 +595,10 @@ export default defineComponent({
         if (page === 1) {
           searchCompletedTimes.value[source.key] = Date.now();
           console.log(`搜索源 ${source.name} 完成搜索，时间戳: ${searchCompletedTimes.value[source.key]}`);
+          
+          // 搜索完成后实时保存状态
+          debouncedSavePageState();
+          console.log('🔄 [状态保存] 搜索完成，触发状态保存:', source.name);
         }
         
         delete errorStates.value[source.key];
@@ -599,7 +620,14 @@ export default defineComponent({
       displayedCount.value = pageSize.value; // 重置显示数量
       updateScrollAreaHeight();
       updateGlobalStats();
+      
+      // 切换搜索源后实时保存状态
+      debouncedSavePageState();
+      console.log('🔄 [状态保存] 切换搜索源，触发状态保存:', sourceKey);
     };
+    
+    // 滚动位置保存的防抖定时器
+    let scrollSaveTimer = null;
     
     // 滚动事件处理
     const handleScroll = (e) => {
@@ -613,6 +641,17 @@ export default defineComponent({
       
       // 实时更新滚动位置
       scrollPosition.value = scrollTop;
+      
+      // 防抖保存滚动位置（使用更长的延迟避免过于频繁）
+      if (scrollSaveTimer) {
+        clearTimeout(scrollSaveTimer);
+      }
+      scrollSaveTimer = setTimeout(() => {
+        if (hasSearched.value && searchKeyword.value) {
+          debouncedSavePageState();
+          console.log('🔄 [状态保存] 滚动位置变化，触发状态保存:', scrollTop);
+        }
+      }, 1000); // 1秒防抖延迟，避免滚动时过于频繁保存
       
       // 当滚动到距离底部50px以内时触发加载
       if (scrollHeight - scrollTop < 50 && hasMoreData.value && !loadingMore.value) {
@@ -646,6 +685,10 @@ export default defineComponent({
         // 增加显示数量
         displayedCount.value += pageSize.value;
         updateGlobalStats();
+        
+        // 加载更多后实时保存状态
+        debouncedSavePageState();
+        console.log('🔄 [状态保存] 加载更多数据，触发状态保存');
       } catch (error) {
         console.error('加载更多数据失败:', error);
         Message.error('加载更多数据失败');
@@ -933,20 +976,38 @@ export default defineComponent({
       Message.success('已清空最近搜索记录');
     };
     
-    // 监听路由参数
-    watch(() => route.query.keyword, (keyword) => {
+    // 监听路由参数 - 监听整个query对象以确保时间戳参数变化时也能触发
+    watch(() => route.query, (newQuery, oldQuery) => {
+      const keyword = newQuery.keyword;
+      const oldKeyword = oldQuery?.keyword;
+      
+      console.log('🔄 [路由监听] query变化:', { 
+        newQuery, 
+        oldQuery, 
+        keyword, 
+        oldKeyword, 
+        currentKeyword: searchKeyword.value 
+      });
+      console.log('🔄 [路由监听] keyword类型:', typeof keyword, '值:', keyword);
+      console.log('🔄 [路由监听] 条件判断 keyword存在:', !!keyword);
+      
       if (keyword) {
+        // 只要有keyword参数，就执行搜索（用户点击搜索按钮时应该重新搜索）
+        console.log('🔄 [路由监听] 准备执行搜索:', keyword);
         searchKeyword.value = keyword;
+        console.log('🔄 [路由监听] 即将调用performSearch');
         performSearch(keyword);
+        console.log('🔄 [路由监听] performSearch调用完成');
       } else {
         // 当没有keyword参数时，重置搜索状态
+        console.log('🔄 [路由监听] 清空搜索状态');
         hasSearched.value = false;
         searchKeyword.value = '';
         searchResults.value = {};
         activeSource.value = '';
         displayedCount.value = pageSize.value;
       }
-    }, { immediate: true });
+    }, { immediate: true, deep: true });
     // 监听输入草稿用于生成建议
     watch(() => route.query.keywordDraft, (draft) => {
       const val = typeof draft === 'string' ? draft : '';
@@ -1043,6 +1104,9 @@ export default defineComponent({
       }
     };
 
+    // 防抖保存状态的定时器
+    let saveStateTimer = null;
+    
     // 状态保存和恢复
     const savePageState = () => {
       if (hasSearched.value && searchKeyword.value) {
@@ -1068,6 +1132,16 @@ export default defineComponent({
         pageStateStore.savePageState('searchAggregation', state);
         console.log('🔄 [状态保存] 保存聚合搜索页面状态:', state);
       }
+    };
+    
+    // 防抖保存状态，避免过于频繁的保存操作
+    const debouncedSavePageState = () => {
+      if (saveStateTimer) {
+        clearTimeout(saveStateTimer);
+      }
+      saveStateTimer = setTimeout(() => {
+        savePageState();
+      }, 500); // 500ms防抖延迟
     };
 
     // 清除页面状态
@@ -1154,6 +1228,9 @@ export default defineComponent({
       
       // 检查URL中是否有关键词参数
       const urlKeyword = route.query.keyword;
+      console.log('🔄 [状态恢复] URL关键词参数:', urlKeyword);
+      console.log('🔄 [状态恢复] 当前搜索关键词:', searchKeyword.value);
+      console.log('🔄 [状态恢复] 当前搜索结果:', Object.keys(searchResults.value).length > 0 ? '有结果' : '无结果');
       
       // 尝试恢复页面状态
       const restored = restorePageState();
@@ -1178,6 +1255,7 @@ export default defineComponent({
         } else if (urlKeyword && urlKeyword === stateKeyword) {
           // URL关键词与恢复状态匹配，使用恢复的状态
           console.log('🔄 [状态恢复] URL关键词与恢复状态匹配，使用恢复的状态');
+          console.log('🔄 [状态恢复] 恢复的搜索结果数量:', Object.keys(searchResults.value).length);
         } else if (urlKeyword && urlKeyword !== stateKeyword) {
           // URL关键词与恢复状态不匹配，执行新搜索
           console.log('🔄 [状态恢复] URL关键词与恢复状态不匹配，执行新搜索:', urlKeyword);
@@ -1204,6 +1282,16 @@ export default defineComponent({
     onBeforeUnmount(() => {
       // 页面离开前保存状态
       savePageState();
+      
+      // 清理定时器
+      if (saveStateTimer) {
+        clearTimeout(saveStateTimer);
+        saveStateTimer = null;
+      }
+      if (scrollSaveTimer) {
+        clearTimeout(scrollSaveTimer);
+        scrollSaveTimer = null;
+      }
     });
 
     onUnmounted(() => {

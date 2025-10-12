@@ -249,22 +249,33 @@ export default defineComponent({
       window.location.reload();
     },
     onSearch(value) {
+      console.log('🔍 [Header] onSearch被触发:', { value, isSearchPage: this.isSearchAggregationPage });
+      
       if (!value || !value.trim()) {
         Message.warning('请输入搜索内容');
         return;
       }
       
+      const keyword = value.trim();
+      console.log('🔍 [Header] 准备执行搜索:', { keyword, currentRoute: this.$route.name });
+      
       if (this.isSearchAggregationPage) {
         // 如果已经在搜索页面，直接更新查询参数
+        console.log('🔍 [Header] 在搜索页面，更新查询参数');
+        // 添加时间戳参数强制触发路由变化，确保即使相同关键词也能重新搜索
         this.$router.push({
           name: 'SearchAggregation',
-          query: { keyword: value.trim() }
+          query: { 
+            keyword,
+            _t: Date.now() // 时间戳参数强制路由更新
+          }
         });
       } else {
         // 如果不在搜索页面，跳转到聚合搜索页面并执行搜索
+        console.log('🔍 [Header] 不在搜索页面，跳转到搜索页面');
         this.$router.push({
           name: 'SearchAggregation',
-          query: { keyword: value.trim() }
+          query: { keyword }
         });
       }
     },
