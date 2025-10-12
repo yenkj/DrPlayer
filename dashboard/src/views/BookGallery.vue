@@ -41,6 +41,12 @@
               </template>
               导出收藏
             </a-doption>
+            <a-doption value="download-manager">
+              <template #icon>
+                <icon-download />
+              </template>
+              下载管理
+            </a-doption>
             <a-doption value="manage-api">
               <template #icon>
                 <icon-settings />
@@ -160,7 +166,8 @@ import {
   IconSettings,
   IconDelete,
   IconLink,
-  IconEye
+  IconEye,
+  IconDownload
 } from '@arco-design/web-vue/es/icon'
 
 const router = useRouter()
@@ -297,6 +304,9 @@ const handleAction = (value) => {
     case 'export':
       exportFavorites()
       break
+    case 'download-manager':
+      openDownloadManager()
+      break
     case 'manage-api':
       showApiManager.value = true
       break
@@ -358,6 +368,10 @@ const exportFavorites = () => {
   } catch (error) {
     Message.error('导出失败，请稍后重试')
   }
+}
+
+const openDownloadManager = () => {
+  router.push('/download-manager')
 }
 
 const clearAllBooks = () => {
