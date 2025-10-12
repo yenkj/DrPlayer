@@ -998,15 +998,48 @@ export default defineComponent({
     };
     
     // 恢复滚动位置
-    const restoreScrollPosition = () => {
+    const restoreScrollPosition = (retryCount = 0) => {
       if (scrollPosition.value > 0) {
-        nextTick(() => {
+        const maxRetries = 5;
+        const delay = Math.min(100 * Math.pow(2, retryCount), 1000); // 指数退避，最大1秒
+        
+        const attemptRestore = () => {
           const scrollContainer = scrollbarRef.value?.$el?.querySelector('.arco-scrollbar-container');
           if (scrollContainer) {
-            scrollContainer.scrollTop = scrollPosition.value;
-            console.log('🔄 [滚动位置] 恢复滚动位置:', scrollPosition.value);
+            // 检查容器是否有内容
+            const hasContent = scrollContainer.scrollHeight > scrollContainer.clientHeight;
+            if (hasContent) {
+              scrollContainer.scrollTop = scrollPosition.value;
+              console.log('🔄 [滚动位置] 恢复滚动位置:', scrollPosition.value);
+              return true;
+            } else if (retryCount < maxRetries) {
+              console.log(`🔄 [滚动位置] 容器内容未完全加载，${delay}ms后重试 (${retryCount + 1}/${maxRetries})`);
+              setTimeout(() => restoreScrollPosition(retryCount + 1), delay);
+              return false;
+            }
+          } else if (retryCount < maxRetries) {
+            console.log(`🔄 [滚动位置] 滚动容器未找到，${delay}ms后重试 (${retryCount + 1}/${maxRetries})`);
+            setTimeout(() => restoreScrollPosition(retryCount + 1), delay);
+            return false;
           }
-        });
+          
+          if (retryCount >= maxRetries) {
+            console.warn('🔄 [滚动位置] 达到最大重试次数，滚动位置恢复失败');
+          }
+          return false;
+        };
+        
+        if (retryCount === 0) {
+          // 首次尝试使用nextTick
+          nextTick(() => {
+            if (!attemptRestore()) {
+              // 如果首次失败，开始重试机制
+              setTimeout(() => restoreScrollPosition(1), 100);
+            }
+          });
+        } else {
+          attemptRestore();
+        }
       }
     };
 
@@ -1085,11 +1118,12 @@ export default defineComponent({
         
         // 延迟恢复滚动位置，确保DOM已渲染
         if (scrollPosition.value > 0) {
-          // 使用多重延迟确保搜索结果完全渲染
+          console.log('🔄 [滚动位置] 准备恢复滚动位置:', scrollPosition.value);
+          // 使用更长的延迟确保搜索结果完全渲染，特别是从详情页返回时
           nextTick(() => {
             setTimeout(() => {
               restoreScrollPosition();
-            }, 200);
+            }, 300); // 增加延迟时间
           });
         }
         
@@ -1132,6 +1166,15 @@ export default defineComponent({
         if (isReturnFromDetail) {
           // 如果是从详情页返回，优先使用恢复的状态，不执行新搜索
           console.log('🔄 [状态恢复] 从详情页返回，使用恢复的状态，不执行新搜索');
+          
+          // 从详情页返回时，需要额外确保滚动位置恢复
+          if (scrollPosition.value > 0) {
+            console.log('🔄 [滚动位置] 从详情页返回，额外确保滚动位置恢复:', scrollPosition.value);
+            // 使用更长的延迟，确保页面完全渲染
+            setTimeout(() => {
+              restoreScrollPosition();
+            }, 500);
+          }
         } else if (urlKeyword && urlKeyword === stateKeyword) {
           // URL关键词与恢复状态匹配，使用恢复的状态
           console.log('🔄 [状态恢复] URL关键词与恢复状态匹配，使用恢复的状态');
