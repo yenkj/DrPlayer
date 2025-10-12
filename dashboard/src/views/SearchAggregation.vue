@@ -688,8 +688,23 @@ export default defineComponent({
         // 记录最后点击的视频
         visitedStore.setLastClicked(video.vod_id, video.name);
         
-        // 跳转到视频详情页面
+        // 获取当前源信息
         const currentSource = searchSources.value.find(s => s.key === activeSource.value);
+        
+        console.log('🎬 [搜索聚合] 点击视频跳转详情页:', {
+          videoName: video.name,
+          videoId: video.vod_id,
+          activeSource: activeSource.value,
+          currentSource: currentSource,
+          sourceInfo: {
+            key: currentSource?.key,
+            name: currentSource?.name,
+            api: currentSource?.api,
+            ext: currentSource?.ext
+          }
+        });
+        
+        // 跳转到视频详情页面
         if (currentSource) {
           router.push({
             name: 'VideoDetail',
@@ -704,9 +719,11 @@ export default defineComponent({
               content: video.content,
               actor: video.actor,
               director: video.director,
-              site: currentSource.key,
-              api: currentSource.api,
-              ext: currentSource.ext,
+              tempSiteKey: currentSource.key,
+              tempSiteApi: currentSource.api,
+              tempSiteName: currentSource.name,
+              tempSiteExt: currentSource.ext,
+              fromSpecialAction: 'true',
               from: 'search-aggregation',
               // 添加来源图片信息，用于详情页图片备用
               sourcePic: video.pic
