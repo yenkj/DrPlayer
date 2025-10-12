@@ -8,8 +8,8 @@
     >
       <a-grid :cols="{ xs: 2, sm: 3, md: 4, lg: 5, xl: 6, xxl: 8 }" :rowGap="16" :colGap="12">
         <a-grid-item
-          v-for="video in videos"
-          :key="video.vod_id"
+          v-for="(video, index) in videos"
+          :key="`${video.vod_id}_${index}_${video.vod_name || ''}`"
           class="video_list_hover"
         >
           <div class="video_list_item" @click="handleVideoClick(video)">
