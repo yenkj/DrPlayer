@@ -137,90 +137,20 @@
                   共 {{ searchResults[activeSource].length }} 条结果
                 </span>
               </div>
-              <a-scrollbar
+              <SearchVideoGrid
                 ref="scrollbarRef"
+                :videos="processedDisplayedResults"
+                :loading="loadingMore"
+                :error="activeSource && errorStates[activeSource] ? `${getSourceName(activeSource)} 搜索失败` : ''"
+                :has-more="hasMoreData"
+                :scroll-height="`${scrollAreaHeight}px`"
+                variant="aggregation"
+                default-poster="/default-poster.svg"
+                @video-click="handleVideoClick"
+                @load-more="handleLoadMore"
+                @retry="() => retrySearch(activeSource)"
                 @scroll="handleScroll"
-                class="search-scroll-container"
-                :style="'height:' + scrollAreaHeight + 'px; overflow: auto;'"
-              >
-                <!-- 搜索结果网格 -->
-                <a-grid 
-                  v-if="searchResults[activeSource] && searchResults[activeSource].length > 0"
-                  :cols="{ xs: 2, sm: 3, md: 4, lg: 5, xl: 6, xxl: 8 }" 
-                  :rowGap="16" 
-                  :colGap="12"
-                  class="video-grid"
-                >
-                  <a-grid-item 
-                    v-for="(video, index) in displayedResults" 
-                    :key="video.vod_id || index"
-                    class="video-card-item"
-                  >
-                    <div class="video-card" @click="handleVideoClick(video)">
-                      <div class="video-poster">
-                        <!-- 优先显示vod_pic图片，如果有值的话 -->
-                        <img
-                          v-if="video.vod_pic && video.vod_pic.trim() !== ''"
-                          class="video-poster-img"
-                          :src="video.vod_pic"
-                          :alt="video.vod_name"
-                          @error="handleImageError"
-                        />
-                        <!-- 文件夹图标 (当vod_pic为空且是文件夹时) -->
-                        <div v-else-if="isFolder(video)" class="folder-icon-container">
-                          <i class="iconfont icon-wenjianjia folder-icon"></i>
-                        </div>
-                        <!-- 文件类型图标 (当vod_pic为空且是目录模式下的非文件夹项目时) -->
-                        <div v-else-if="isDirectoryFile(video)" class="file-icon-container">
-                          <svg style="width:30%">
-                            <use :href="`#${getFileTypeIcon(video.vod_name)}`"></use>
-                          </svg>
-                        </div>
-                        <!-- 默认图片 (当vod_pic为空且没有特殊标识时) -->
-                        <img
-                          v-else
-                          class="video-poster-img"
-                          :src="video.vod_pic || '/default-poster.svg'"
-                          :alt="video.vod_name"
-                          @error="handleImageError"
-                        />
-                        <!-- Action标识 -->
-                        <div v-if="video.vod_tag === 'action'" class="action-badge">
-                          <icon-thunderbolt />
-                        </div>
-                        <!-- 播放按钮覆盖层 -->
-                        <div class="play-overlay">
-                          <icon-play-arrow-fill />
-                        </div>
-                        <!-- vod_remarks 浮层 -->
-                        <div v-if="video.vod_remarks" class="video-remarks-overlay" v-html="video.vod_remarks">
-                        </div>
-                      </div>
-                      <div class="video-info">
-                        <h3 class="video-title" :title="video.vod_name">{{ video.vod_name }}</h3>
-                        <div class="video-meta">
-                          <span v-if="video.vod_year" class="video-year">{{ video.vod_year }}</span>
-                          <span v-if="video.vod_area" class="video-area">{{ video.vod_area }}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </a-grid-item>
-                </a-grid>
-
-                <!-- 加载更多 -->
-                <div v-if="loadingMore" class="loading-container">
-                  <a-spin />
-                  <div class="loading-text">加载更多...</div>
-                </div>
-                
-                <!-- 没有更多数据提示 -->
-                <div v-else-if="!hasMoreData && searchResults[activeSource] && searchResults[activeSource].length > 0" class="no-more-data">
-                  没有更多数据了
-                </div>
-
-                <!-- 底部间距 -->
-                <div class="bottom-spacer"></div>
-              </a-scrollbar>
+              />
             </div>
 
             
@@ -279,6 +209,7 @@ import {
 } from '@arco-design/web-vue/es/icon';
 import SearchSettingsModal from '@/components/SearchSettingsModal.vue';
 import ActionRenderer from '@/components/actions/ActionRenderer.vue';
+import SearchVideoGrid from '@/components/SearchVideoGrid.vue';
 import { getFileTypeIcon, isFolder, isDirectoryFile } from '@/utils/fileTypeUtils';
 import { usePaginationStore } from '@/stores/paginationStore';
 import { usePageStateStore } from '@/stores/pageStateStore';
@@ -291,6 +222,7 @@ export default defineComponent({
   components: {
     SearchSettingsModal,
     ActionRenderer,
+    SearchVideoGrid,
     IconHistory,
     IconBulb,
     IconFire,
@@ -367,6 +299,14 @@ export default defineComponent({
         return [];
       }
       return searchResults.value[activeSource.value].slice(0, displayedCount.value);
+    });
+
+    // 处理后的显示结果，为SearchVideoGrid组件准备数据
+    const processedDisplayedResults = computed(() => {
+      return displayedResults.value.map(video => ({
+        ...video,
+        fileType: isFolder(video) ? 'folder' : (isDirectoryFile(video) ? getFileTypeIcon(video.vod_name) : null)
+      }));
     });
     
     const hasMoreData = computed(() => {
@@ -646,31 +586,33 @@ export default defineComponent({
     
     // 滚动事件处理
     const handleScroll = (e) => {
-      // 获取真正的滚动容器（arco-scrollbar内部容器）
-      const rawTarget = e?.target || e?.srcElement;
-      const container = rawTarget?.closest ? rawTarget.closest('.arco-scrollbar-container') : rawTarget;
-      if (!container) return;
-
-      const scrollHeight = container.scrollHeight - container.clientHeight;
-      const scrollTop = container.scrollTop;
-      
-      // 实时更新滚动位置
-      scrollPosition.value = scrollTop;
-      
-      // 防抖保存滚动位置（使用更长的延迟避免过于频繁）
-      if (scrollSaveTimer) {
-        clearTimeout(scrollSaveTimer);
-      }
-      scrollSaveTimer = setTimeout(() => {
-        if (hasSearched.value && searchKeyword.value) {
-          debouncedSavePageState();
-          console.log('🔄 [状态保存] 滚动位置变化，触发状态保存:', scrollTop);
+      // 使用SearchVideoGrid组件的方法获取滚动位置
+      if (scrollbarRef.value?.getScrollTop && scrollbarRef.value?.getScrollContainer) {
+        const scrollTop = scrollbarRef.value.getScrollTop();
+        const container = scrollbarRef.value.getScrollContainer();
+        
+        if (!container) return;
+        
+        const scrollHeight = container.scrollHeight - container.clientHeight;
+        
+        // 实时更新滚动位置
+        scrollPosition.value = scrollTop;
+        
+        // 防抖保存滚动位置（使用更长的延迟避免过于频繁）
+        if (scrollSaveTimer) {
+          clearTimeout(scrollSaveTimer);
         }
-      }, 1000); // 1秒防抖延迟，避免滚动时过于频繁保存
-      
-      // 当滚动到距离底部50px以内时触发加载
-      if (scrollHeight - scrollTop < 50 && hasMoreData.value && !loadingMore.value) {
-        loadMore();
+        scrollSaveTimer = setTimeout(() => {
+          if (hasSearched.value && searchKeyword.value) {
+            debouncedSavePageState();
+            console.log('🔄 [状态保存] 滚动位置变化，触发状态保存:', scrollTop);
+          }
+        }, 1000); // 1秒防抖延迟，避免滚动时过于频繁保存
+        
+        // 当滚动到距离底部50px以内时触发加载
+        if (scrollHeight - scrollTop < 50 && hasMoreData.value && !loadingMore.value) {
+          loadMore();
+        }
       }
     };
     
@@ -710,6 +652,11 @@ export default defineComponent({
       } finally {
         loadingMore.value = false;
       }
+    };
+
+    // 处理SearchVideoGrid组件的load-more事件
+    const handleLoadMore = () => {
+      loadMore();
     };
     
     // 动态计算滚动区域高度
@@ -812,7 +759,17 @@ export default defineComponent({
        const displayedResults = Math.min(displayedCount.value, totalResults);
        const sourceName = getSourceName(activeSource.value);
        
+       // 计算当前页数和总页数
+       const currentPage = Math.ceil(displayedResults / pageSize.value) || 1;
+       const totalPages = Math.ceil(totalResults / pageSize.value) || 1;
+       
        let statsText = `搜索"${searchKeyword.value}"：${sourceName} - 已显示${displayedResults}条，共${totalResults}条`;
+       
+       // 添加页数信息
+       if (totalResults > 0) {
+         statsText += ` (第${currentPage}页/共${totalPages}页)`;
+       }
+       
        // 检查是否还有更多数据可以加载
        const hasMore = hasMoreData.value;
        if (hasMore) {
@@ -1085,9 +1042,8 @@ export default defineComponent({
     
     // 保存滚动位置
     const saveScrollPosition = () => {
-      const scrollContainer = scrollbarRef.value?.$el?.querySelector('.arco-scrollbar-container');
-      if (scrollContainer) {
-        scrollPosition.value = scrollContainer.scrollTop;
+      if (scrollbarRef.value?.getScrollTop) {
+        scrollPosition.value = scrollbarRef.value.getScrollTop();
         console.log('🔄 [滚动位置] 保存滚动位置:', scrollPosition.value);
       }
     };
@@ -1099,21 +1055,27 @@ export default defineComponent({
         const delay = Math.min(100 * Math.pow(2, retryCount), 1000); // 指数退避，最大1秒
         
         const attemptRestore = () => {
-          const scrollContainer = scrollbarRef.value?.$el?.querySelector('.arco-scrollbar-container');
-          if (scrollContainer) {
-            // 检查容器是否有内容
-            const hasContent = scrollContainer.scrollHeight > scrollContainer.clientHeight;
-            if (hasContent) {
-              scrollContainer.scrollTop = scrollPosition.value;
-              console.log('🔄 [滚动位置] 恢复滚动位置:', scrollPosition.value);
-              return true;
+          if (scrollbarRef.value?.scrollTo && scrollbarRef.value?.getScrollContainer) {
+            const scrollContainer = scrollbarRef.value.getScrollContainer();
+            if (scrollContainer) {
+              // 检查容器是否有内容
+              const hasContent = scrollContainer.scrollHeight > scrollContainer.clientHeight;
+              if (hasContent) {
+                scrollbarRef.value.scrollTo({ top: scrollPosition.value });
+                console.log('🔄 [滚动位置] 恢复滚动位置:', scrollPosition.value);
+                return true;
+              } else if (retryCount < maxRetries) {
+                console.log(`🔄 [滚动位置] 容器内容未完全加载，${delay}ms后重试 (${retryCount + 1}/${maxRetries})`);
+                setTimeout(() => restoreScrollPosition(retryCount + 1), delay);
+                return false;
+              }
             } else if (retryCount < maxRetries) {
-              console.log(`🔄 [滚动位置] 容器内容未完全加载，${delay}ms后重试 (${retryCount + 1}/${maxRetries})`);
+              console.log(`🔄 [滚动位置] 滚动容器未找到，${delay}ms后重试 (${retryCount + 1}/${maxRetries})`);
               setTimeout(() => restoreScrollPosition(retryCount + 1), delay);
               return false;
             }
           } else if (retryCount < maxRetries) {
-            console.log(`🔄 [滚动位置] 滚动容器未找到，${delay}ms后重试 (${retryCount + 1}/${maxRetries})`);
+            console.log(`🔄 [滚动位置] SearchVideoGrid组件方法未就绪，${delay}ms后重试 (${retryCount + 1}/${maxRetries})`);
             setTimeout(() => restoreScrollPosition(retryCount + 1), delay);
             return false;
           }
@@ -1356,6 +1318,7 @@ export default defineComponent({
       errorStates,
       activeSource,
       displayedResults,
+      processedDisplayedResults,
       hasMoreData,
       loadingMore,
       scrollbarRef,
@@ -1378,6 +1341,7 @@ export default defineComponent({
       handleVideoClick,
       handleImageError,
       handleScroll,
+      handleLoadMore,
       handleActionClose,
       randomizeHotSearchTags,
       clearPageState,
@@ -1706,221 +1670,7 @@ export default defineComponent({
   font-size: 14px;
 }
 
-/* 搜索结果滚动容器 */
-.search-scroll-container {
-  border-radius: 8px;
-  border: 1px solid var(--color-border-2);
-}
 
-.search-results-grid {
-  padding: 16px;
-}
-
-/* 视频卡片样式 */
-.video-card-item {
-  width: 100%;
-}
-
-.video-card {
-  background: var(--color-bg-2);
-  border-radius: 8px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border: 1px solid var(--color-border-2);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.video-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  border-color: var(--color-primary-light-4);
-}
-
-.video-poster {
-  position: relative;
-  width: 100%;
-  height: 200px;
-  overflow: hidden;
-  flex-shrink: 0;
-  background: var(--color-fill-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.video-poster img,
-.video-poster-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.video-card:hover .video-poster img,
-.video-card:hover .video-poster-img {
-  transform: scale(1.05);
-}
-
-.folder-icon-container,
-.file-icon-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  background: var(--color-fill-3);
-}
-
-.folder-icon {
-  font-size: 48px;
-  color: var(--color-text-3);
-}
-
-.play-overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 50px;
-  height: 50px;
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 20px;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.video-card:hover .play-overlay {
-  opacity: 1;
-}
-
-.action-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
-  background: var(--color-warning-6);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 12px;
-  z-index: 2;
-}
-
-.video-info {
-  padding: 12px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.video-title {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text-1);
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.video-desc {
-  margin: 0 0 8px 0;
-  font-size: 12px;
-  color: var(--color-text-3);
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.video-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--color-text-3);
-  flex-wrap: wrap;
-}
-
-.video-note {
-  background: var(--color-primary-light-1);
-  color: var(--color-primary-6);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.video-year,
-.video-area {
-  color: var(--color-text-3);
-}
-
-.video-remarks-overlay {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 3px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 500;
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(4px);
-  z-index: 2;
-}
-
-.meta-item {
-  font-size: 11px;
-  color: var(--color-text-4);
-  background: var(--color-fill-2);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-/* 加载更多和无更多数据提示 */
-.loading-container,
-.no-more-data {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 20px;
-  color: var(--color-text-3);
-  font-size: 14px;
-}
-
-.loading-container {
-  color: var(--color-primary-6);
-}
-
-.loading-text {
-  margin-left: 8px;
-}
-
-.bottom-spacer {
-  height: 20px;
-}
 
 
 
@@ -1967,11 +1717,7 @@ export default defineComponent({
     margin-bottom: 0;
   }
   
-  .video-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 16px;
-    padding: 16px;
-  }
+
   
   .search-header {
     padding: 0 16px;
