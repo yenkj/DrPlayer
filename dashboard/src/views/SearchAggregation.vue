@@ -693,15 +693,26 @@ export default defineComponent({
      
      // 更新全局统计信息
      const updateGlobalStats = () => {
+       console.log('[updateGlobalStats] 更新全局统计信息');
        if (!activeSource.value || !searchResults.value[activeSource.value]) {
-         paginationStore.updateStats(0, 0, 0);
+         paginationStore.updateStats('');
          return;
        }
        
        const totalResults = searchResults.value[activeSource.value].length;
        const displayedResults = Math.min(displayedCount.value, totalResults);
+       const sourceName = getSourceName(activeSource.value);
        
-       paginationStore.updateStats(displayedResults, totalResults, 1);
+       let statsText = `搜索"${searchKeyword.value}"：${sourceName} - 已显示${displayedResults}条，共${totalResults}条`;
+       // 检查是否还有更多数据可以加载
+       const hasMore = hasMoreData.value;
+       if (hasMore) {
+         statsText += '，可继续加载';
+       } else if (totalResults > 0) {
+         statsText += '，已全部加载';
+       }
+       console.log('[updateGlobalStats] <statsText>:', statsText);
+       paginationStore.updateStats(statsText);
      };
      
      // ActionRenderer相关方法
