@@ -103,6 +103,9 @@
           <a-button class="cancel-btn" @click="hideCloseConfirm">
             取消
           </a-button>
+          <a-button type="primary" status="warning" class="clear-cache-btn" @click="clearSessionStorage">
+            仅清缓存
+          </a-button>
           <a-button type="primary" status="danger" class="confirm-btn" @click="confirmClose">
             确认关闭
           </a-button>
@@ -345,6 +348,17 @@ export default defineComponent({
     },
     hideCloseConfirm() {
       this.showConfirmModal = false;
+    },
+    clearSessionStorage() {
+      try {
+        // 清除当前页面的sessionStorage
+        sessionStorage.clear();
+        this.showConfirmModal = false;
+        Message.success("缓存已清除");
+      } catch (error) {
+        console.error('清除缓存失败:', error);
+        Message.error("清除缓存失败");
+      }
     },
     confirmClose() {
       this.showConfirmModal = false;
@@ -695,6 +709,13 @@ export default defineComponent({
 
 .cancel-btn {
   min-width: 80px;
+  height: 36px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.clear-cache-btn {
+  min-width: 90px;
   height: 36px;
   border-radius: 6px;
   font-weight: 500;
