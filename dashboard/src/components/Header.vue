@@ -139,9 +139,32 @@ export default defineComponent({
       return route.name === 'SearchAggregation';
     });
     
-    // 检测是否有搜索结果（当在搜索页面且有搜索关键词时）
+    // 检测是否有搜索结果（当在搜索页面且有搜索关键词或保存的搜索状态时）
     const hasSearchResults = computed(() => {
-      return isSearchAggregationPage.value && route.query.keyword;
+      // 依赖forceUpdate来触发重新计算
+      forceUpdate.value;
+      
+      if (!isSearchAggregationPage.value) {
+        return false;
+      }
+      
+      // 检查URL参数
+      if (route.query.keyword) {
+        return true;
+      }
+      
+      // 检查是否有保存的搜索状态
+      try {
+        const savedState = localStorage.getItem('pageState_searchAggregation');
+        if (savedState) {
+          const state = JSON.parse(savedState);
+          return state.hasSearched && state.searchKeyword;
+        }
+      } catch (error) {
+        console.error('检查搜索状态失败:', error);
+      }
+      
+      return false;
     });
     
     // 从localStorage获取聚搜功能状态
@@ -161,9 +184,14 @@ export default defineComponent({
     // 响应式的聚搜状态
     const searchAggregationEnabled = ref(getSearchAggregationStatus());
     
+    // 用于强制更新hasSearchResults计算属性的响应式变量
+    const forceUpdate = ref(0);
+    
     // 监听localStorage变化
     const updateSearchAggregationStatus = () => {
       searchAggregationEnabled.value = getSearchAggregationStatus();
+      // 强制更新hasSearchResults计算属性
+      forceUpdate.value++;
     };
     
     // 监听storage事件
@@ -275,6 +303,15 @@ export default defineComponent({
     closeSearchResults() {
       // 关闭搜索结果，回到搜索页面的初始状态
       this.searchValue = '';
+      
+      // 清除保存的页面状态
+      try {
+        localStorage.removeItem('pageState_searchAggregation');
+        console.log('🔄 [状态清理] 已清除聚合搜索页面保存的状态');
+      } catch (error) {
+        console.error('清除页面状态失败:', error);
+      }
+      
       this.$router.push({ name: 'SearchAggregation' });
     },
     minimize() {

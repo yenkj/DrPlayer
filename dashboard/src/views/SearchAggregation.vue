@@ -1029,11 +1029,32 @@ export default defineComponent({
           displayedCount: displayedCount.value,
           scrollPosition: scrollPosition.value,
           scrollAreaHeight: scrollAreaHeight.value,
-          loadingMore: loadingMore.value
+          loadingMore: loadingMore.value,
+          timestamp: Date.now() // 添加时间戳用于判断状态新鲜度
         };
         pageStateStore.savePageState('searchAggregation', state);
         console.log('🔄 [状态保存] 保存聚合搜索页面状态:', state);
       }
+    };
+
+    // 清除页面状态
+    const clearPageState = () => {
+      pageStateStore.clearPageState('searchAggregation');
+      console.log('🔄 [状态清理] 已清除聚合搜索页面状态');
+      
+      // 重置所有状态到初始值
+      searchKeyword.value = '';
+      hasSearched.value = false;
+      searchResults.value = {};
+      loadingStates.value = {};
+      errorStates.value = {};
+      activeSource.value = '';
+      currentPages.value = {};
+      hasMorePages.value = {};
+      searchCompletedTimes.value = {};
+      displayedCount.value = pageSize.value;
+      scrollPosition.value = 0;
+      loadingMore.value = false;
     };
 
     const restorePageState = () => {
@@ -1097,23 +1118,36 @@ export default defineComponent({
       const isReturnFromDetail = route.query._returnFromDetail === 'true';
       console.log('🔄 [状态恢复] 是否从详情页返回:', isReturnFromDetail);
       
+      // 检查URL中是否有关键词参数
+      const urlKeyword = route.query.keyword;
+      
       // 尝试恢复页面状态
       const restored = restorePageState();
       if (restored) {
         console.log('🔄 [状态恢复] 成功恢复聚合搜索页面状态');
         
-        // 如果是从详情页返回，优先使用恢复的状态，不执行新搜索
+        // 检查恢复的状态是否与URL参数匹配
+        const stateKeyword = searchKeyword.value;
+        
         if (isReturnFromDetail) {
+          // 如果是从详情页返回，优先使用恢复的状态，不执行新搜索
           console.log('🔄 [状态恢复] 从详情页返回，使用恢复的状态，不执行新搜索');
-        } else if (route.query.keyword && route.query.keyword !== searchKeyword.value) {
-          // 如果不是从详情页返回，且URL中有不同的关键词，则执行新的搜索
-          console.log('🔄 [状态恢复] URL关键词与恢复状态不同，执行新搜索:', route.query.keyword);
-          performSearch(route.query.keyword);
+        } else if (urlKeyword && urlKeyword === stateKeyword) {
+          // URL关键词与恢复状态匹配，使用恢复的状态
+          console.log('🔄 [状态恢复] URL关键词与恢复状态匹配，使用恢复的状态');
+        } else if (urlKeyword && urlKeyword !== stateKeyword) {
+          // URL关键词与恢复状态不匹配，执行新搜索
+          console.log('🔄 [状态恢复] URL关键词与恢复状态不匹配，执行新搜索:', urlKeyword);
+          performSearch(urlKeyword);
+        } else if (!urlKeyword && stateKeyword) {
+          // URL中没有关键词但有恢复状态，说明用户可能点击了关闭按钮，清除状态
+          console.log('🔄 [状态恢复] URL中没有关键词但有恢复状态，清除状态回到初始页面');
+          clearPageState();
         }
-      } else if (route.query.keyword) {
+      } else if (urlKeyword) {
         // 如果没有恢复状态但URL中有关键词，则执行搜索
-        console.log('🔄 [状态恢复] 没有保存状态，根据URL关键词执行搜索:', route.query.keyword);
-        performSearch(route.query.keyword);
+        console.log('🔄 [状态恢复] 没有保存状态，根据URL关键词执行搜索:', urlKeyword);
+        performSearch(urlKeyword);
       }
       
       // 清理URL中的返回标识
@@ -1167,6 +1201,7 @@ export default defineComponent({
       handleScroll,
       handleActionClose,
       randomizeHotSearchTags,
+      clearPageState,
       // 最近搜索
       recentSearches,
       clearRecentSearches,
