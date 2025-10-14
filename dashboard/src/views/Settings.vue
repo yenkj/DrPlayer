@@ -1376,7 +1376,7 @@ const handleProxyPlayEnabledChange = (enabled) => {
 
 // 下载代理播放器
 const downloadProxyPlayer = () => {
-  const url = 'https://wwvy.lanzouo.com/iPNGu37snuna'
+  const url = 'https://pan.quark.cn/s/7eb53b20db95'
   window.open(url, '_blank')
   Message.success('正在打开代理播放器下载页面')
 }
