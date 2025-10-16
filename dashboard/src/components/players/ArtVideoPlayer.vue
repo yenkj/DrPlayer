@@ -209,6 +209,7 @@ const proxySettingsVersion = ref(0)
 const danmakuEnabled = ref(JSON.parse(localStorage.getItem('danmakuEnabled') || 'true'))
 const danmakuData = ref([])
 const danmakuLoading = ref(false)
+const currentDanmakuUrl = ref('') // 当前弹幕iframe的URL
 
 
 // 计算属性：是否显示调试按钮
@@ -456,23 +457,8 @@ const parseDanmakuData = (data) => {
   }
 }
 
-// 创建弹幕iframe层 - 处理web://协议的弹幕链接
-const createDanmakuIframeLayer = async (iframeUrl) => {
-  try {
-    if (!artPlayerInstance.value) {
-      console.warn('ArtPlayer实例不存在，无法创建弹幕iframe层')
-      return
-    }
-
-    console.log('创建弹幕iframe层:', iframeUrl)
-
-    // 移除已存在的弹幕iframe层
-    removeDanmakuIframeLayer()
-
-    // 更新iframe层内容
-    artPlayerInstance.value.layers.update({
-      name: 'danmaku-iframe',
-      html: `
+const buildDanmakuIframeHtml = (iframeUrl)=>{
+  return `
         <div class="danmaku-iframe-container" style="
           position: absolute;
           top: 0;
@@ -482,8 +468,8 @@ const createDanmakuIframeLayer = async (iframeUrl) => {
           pointer-events: none;
           z-index: 10;
         ">
-          <iframe 
-            src="${iframeUrl}" 
+          <iframe
+            src="${iframeUrl}"
             style="
               width: 100%;
               height: 100%;
@@ -495,7 +481,29 @@ const createDanmakuIframeLayer = async (iframeUrl) => {
             allowtransparency="true"
           ></iframe>
         </div>
-      `,
+      `
+}
+
+// 创建弹幕iframe层 - 处理web://协议的弹幕链接
+const createDanmakuIframeLayer = async (iframeUrl) => {
+  try {
+    if (!artPlayerInstance.value) {
+      console.warn('ArtPlayer实例不存在，无法创建弹幕iframe层')
+      return
+    }
+
+    console.log('创建弹幕iframe层:', iframeUrl)
+
+    // 存储当前弹幕URL
+    currentDanmakuUrl.value = iframeUrl
+
+    // 移除已存在的弹幕iframe层
+    removeDanmakuIframeLayer()
+
+    // 更新iframe层内容
+    artPlayerInstance.value.layers.update({
+      name: 'danmaku-iframe',
+      html: buildDanmakuIframeHtml(currentDanmakuUrl.value),
       style: {
         position: 'absolute',
         top: '0',
@@ -503,7 +511,7 @@ const createDanmakuIframeLayer = async (iframeUrl) => {
         width: '100%',
         height: '100%',
         pointerEvents: 'none',
-        display: 'block',
+        display: danmakuEnabled.value ? 'block' : 'none',
         zIndex: '10'
       }
     })
@@ -514,7 +522,7 @@ const createDanmakuIframeLayer = async (iframeUrl) => {
   }
 }
 
-// 移除弹幕iframe层
+// 移除弹幕iframe层（完全清空内容）
 const removeDanmakuIframeLayer = () => {
   try {
     if (artPlayerInstance.value && artPlayerInstance.value.layers) {
@@ -535,6 +543,59 @@ const removeDanmakuIframeLayer = () => {
     }
   } catch (error) {
     console.error('移除弹幕iframe层失败:', error)
+  }
+}
+
+// 隐藏弹幕iframe层（保留内容，只隐藏显示）
+const hideDanmakuIframeLayer = () => {
+  try {
+    if (artPlayerInstance.value && artPlayerInstance.value.layers) {
+      const currentLayer = artPlayerInstance.value.layers['danmaku-iframe']
+      if (currentLayer) {
+        artPlayerInstance.value.layers.update({
+          name: 'danmaku-iframe',
+          html: '',
+          style: {
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            zIndex: '10',
+            display: 'none'
+          }
+        })
+        console.log('隐藏弹幕iframe层成功')
+      }
+    }
+  } catch (error) {
+    console.error('隐藏弹幕iframe层失败:', error)
+  }
+}
+
+// 显示弹幕iframe层
+const showDanmakuIframeLayer = () => {
+  try {
+    if (artPlayerInstance.value && artPlayerInstance.value.layers && currentDanmakuUrl.value) {
+      artPlayerInstance.value.layers.update({
+        name: 'danmaku-iframe',
+        html: buildDanmakuIframeHtml(currentDanmakuUrl.value),
+        style: {
+          position: 'absolute',
+          top: '0',
+          left: '0',
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          display: 'block',
+          zIndex: '10'
+        }
+      })
+      console.log('显示弹幕iframe层成功:', currentDanmakuUrl.value)
+    }
+  } catch (error) {
+    console.error('显示弹幕iframe层失败:', error)
   }
 }
 
@@ -1892,6 +1953,15 @@ watch(danmakuEnabled, (newEnabled) => {
     } catch (error) {
       console.error('控制弹幕显示/隐藏失败:', error)
     }
+  }
+
+  // 控制iframe弹幕层的显示/隐藏
+  if (newEnabled) {
+    console.log('showDanmakuIframeLayer');
+    showDanmakuIframeLayer()
+  } else {
+    console.log('hideDanmakuIframeLayer');
+    hideDanmakuIframeLayer()
   }
 
   // 持久化到 localStorage
