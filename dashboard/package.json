@@ -1,7 +1,7 @@
 {
   "name": "drplayer",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1 20251016",
   "type": "module",
   "scripts": {
     "dev": "vite",
