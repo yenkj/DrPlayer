@@ -135,6 +135,11 @@ const props = defineProps({
     type: Object,
     default: () => ({})
   },
+  // 弹幕链接，用于弹幕功能
+  danmakuUrl: {
+    type: String,
+    default: ''
+  },
   // 画质相关属性
   qualities: {
     type: Array,
@@ -357,19 +362,39 @@ const loadDanmakuData = async (videoUrl) => {
   danmakuLoading.value = true
 
   try {
-    const danmakuUrl = parseDanmakuUrl(videoUrl)
+    // 优先使用 T4 解析返回的弹幕链接
+    let danmakuUrl = props.danmakuUrl
+    
+    // 如果没有 T4 弹幕链接，尝试从视频URL解析
+    if (!danmakuUrl) {
+      danmakuUrl = parseDanmakuUrl(videoUrl)
+    }
+    
     if (!danmakuUrl) {
       console.log('无法解析弹幕URL，使用默认弹幕数据')
       return getDefaultDanmakuData()
     }
 
-    // 这里可以实现实际的弹幕数据加载逻辑
-    // const response = await fetch(danmakuUrl)
-    // const data = await response.json()
-    // return parseDanmakuData(data)
+    console.log('弹幕链接:', danmakuUrl)
 
-    // 暂时返回默认弹幕数据
-    return getDefaultDanmakuData()
+    // 处理不同协议的弹幕链接
+    if (danmakuUrl.startsWith('http://') || danmakuUrl.startsWith('https://')) {
+      // HTTP协议：直接请求弹幕数据
+      console.log('处理HTTP协议弹幕链接:', danmakuUrl)
+      const response = await fetch(danmakuUrl)
+      const data = await response.json()
+      return parseDanmakuData(data)
+    } else if (danmakuUrl.startsWith('web://')) {
+      // WEB协议：创建自定义HTML层显示iframe
+      console.log('处理WEB协议弹幕链接:', danmakuUrl)
+      const iframeUrl = danmakuUrl.replace('web://', '')
+      await createDanmakuIframeLayer(iframeUrl)
+      // WEB协议不返回弹幕数据，而是通过iframe显示
+      return []
+    } else {
+      console.log('未知弹幕协议，使用默认弹幕数据')
+      return getDefaultDanmakuData()
+    }
   } catch (error) {
     console.error('加载弹幕数据失败:', error)
     return getDefaultDanmakuData()
@@ -399,6 +424,174 @@ const getDefaultDanmakuData = () => {
       type: 'top'
     }
   ]
+}
+
+// 解析弹幕数据 - 将HTTP协议返回的数据转换为ArtPlayer弹幕格式
+const parseDanmakuData = (data) => {
+  try {
+    // 处理不同格式的弹幕数据
+    if (Array.isArray(data)) {
+      // 如果已经是数组格式，直接处理
+      return data.map(item => ({
+        text: item.text || item.content || '',
+        time: parseFloat(item.time || item.timestamp || 0),
+        color: item.color || '#ffffff',
+        type: item.type || 'right'
+      })).filter(item => item.text.trim().length > 0)
+    } else if (data.data && Array.isArray(data.data)) {
+      // 如果数据在data字段中
+      return data.data.map(item => ({
+        text: item.text || item.content || '',
+        time: parseFloat(item.time || item.timestamp || 0),
+        color: item.color || '#ffffff',
+        type: item.type || 'right'
+      })).filter(item => item.text.trim().length > 0)
+    } else {
+      console.warn('未知的弹幕数据格式:', data)
+      return getDefaultDanmakuData()
+    }
+  } catch (error) {
+    console.error('解析弹幕数据失败:', error)
+    return getDefaultDanmakuData()
+  }
+}
+
+// 创建弹幕iframe层 - 处理web://协议的弹幕链接
+const createDanmakuIframeLayer = async (iframeUrl) => {
+  try {
+    if (!artPlayerInstance.value) {
+      console.warn('ArtPlayer实例不存在，无法创建弹幕iframe层')
+      return
+    }
+
+    console.log('创建弹幕iframe层:', iframeUrl)
+
+    // 移除已存在的弹幕iframe层
+    removeDanmakuIframeLayer()
+
+    // 更新iframe层内容
+    artPlayerInstance.value.layers.update({
+      name: 'danmaku-iframe',
+      html: `
+        <div class="danmaku-iframe-container" style="
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 10;
+        ">
+          <iframe 
+            src="${iframeUrl}" 
+            style="
+              width: 100%;
+              height: 100%;
+              border: none;
+              background: transparent;
+              pointer-events: auto;
+            "
+            frameborder="0"
+            allowtransparency="true"
+          ></iframe>
+        </div>
+      `,
+      style: {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        display: 'block',
+        zIndex: '10'
+      }
+    })
+
+    console.log('弹幕iframe层创建成功')
+  } catch (error) {
+    console.error('创建弹幕iframe层失败:', error)
+  }
+}
+
+// 移除弹幕iframe层
+const removeDanmakuIframeLayer = () => {
+  try {
+    if (artPlayerInstance.value && artPlayerInstance.value.layers) {
+      artPlayerInstance.value.layers.update({
+        name: 'danmaku-iframe',
+        html: '',
+        style: {
+          position: 'absolute',
+          top: '0',
+          left: '0',
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          display: 'none',
+          zIndex: '10'
+        }
+      })
+    }
+  } catch (error) {
+    console.error('移除弹幕iframe层失败:', error)
+  }
+}
+
+// 处理弹幕URL - 根据协议类型选择处理方式
+const handleDanmakuUrl = async () => {
+  try {
+    if (!props.danmakuUrl || !props.danmakuUrl.trim()) {
+      console.log('没有弹幕URL，使用默认弹幕数据')
+      return
+    }
+
+    const danmakuUrl = props.danmakuUrl.trim()
+    console.log('处理弹幕URL:', danmakuUrl)
+
+    if (danmakuUrl.startsWith('web://')) {
+      // 处理web://协议 - 创建iframe层
+      const iframeUrl = danmakuUrl.substring(6) // 移除 'web://' 前缀
+      console.log('检测到web://协议，创建iframe层:', iframeUrl)
+      await createDanmakuIframeLayer(iframeUrl)
+    } else if (danmakuUrl.startsWith('http://') || danmakuUrl.startsWith('https://')) {
+      // 处理HTTP协议 - 加载弹幕数据
+      console.log('检测到HTTP协议，加载弹幕数据:', danmakuUrl)
+      danmakuLoading.value = true
+      
+      try {
+        const response = await fetch(danmakuUrl)
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        const parsedData = parseDanmakuData(data)
+        
+        // 更新弹幕数据
+        danmakuData.value = parsedData
+        console.log('弹幕数据加载成功，条数:', parsedData.length)
+        
+        // 如果弹幕插件已初始化，更新弹幕数据
+        if (artPlayerInstance.value && artPlayerInstance.value.plugins && artPlayerInstance.value.plugins.artplayerPluginDanmuku) {
+          artPlayerInstance.value.plugins.artplayerPluginDanmuku.config({
+            danmuku: parsedData
+          })
+          console.log('弹幕插件数据已更新')
+        }
+      } catch (error) {
+        console.error('加载弹幕数据失败:', error)
+        // 使用默认弹幕数据
+        danmakuData.value = getDefaultDanmakuData()
+      } finally {
+        danmakuLoading.value = false
+      }
+    } else {
+      console.warn('不支持的弹幕URL协议:', danmakuUrl)
+    }
+  } catch (error) {
+    console.error('处理弹幕URL失败:', error)
+  }
 }
 
 // 初始化 ArtPlayer
@@ -681,6 +874,20 @@ const initArtPlayer = async (url) => {
               hideQualityLayer()
             }
           }
+        },
+        {
+          name: 'danmaku-iframe',
+          html: '',
+          style: {
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            display: 'none',
+            zIndex: '10'
+          }
         }
       ],
       // 插件配置
@@ -704,6 +911,8 @@ const initArtPlayer = async (url) => {
       console.log('ArtPlayer 准备就绪')
       // 应用片头片尾设置
       applySkipSettings()
+      // 处理弹幕URL
+      handleDanmakuUrl()
     })
 
     art.on('video:loadstart', () => {
@@ -1689,6 +1898,19 @@ watch(danmakuEnabled, (newEnabled) => {
   localStorage.setItem('danmakuEnabled', newEnabled.toString())
 })
 
+// 监听弹幕URL变化，重新处理弹幕
+watch(() => props.danmakuUrl, async (newDanmakuUrl) => {
+  console.log('danmakuUrl 变化:', newDanmakuUrl)
+  
+  if (artPlayerInstance.value) {
+    // 移除之前的iframe层
+    removeDanmakuIframeLayer()
+    
+    // 处理新的弹幕URL
+    await handleDanmakuUrl()
+  }
+})
+
 // 窗口大小变化处理
 const handleResize = () => {
   if (artPlayerContainer.value && artPlayerInstance.value) {
@@ -1748,6 +1970,9 @@ onUnmounted(() => {
 
   // 销毁播放器实例
   if (artPlayerInstance.value) {
+    // 清理弹幕iframe层
+    removeDanmakuIframeLayer()
+    
     // 清理自定义播放器
     if (artPlayerInstance.value.customPlayer && artPlayerInstance.value.customPlayerFormat) {
       const format = artPlayerInstance.value.customPlayerFormat
